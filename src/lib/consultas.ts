@@ -2,7 +2,8 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { criterio, estudo, protocolo, triagem } from "@/db/schema";
 
-export type EstagioDeTriagem = "titulo_resumo" | "texto_completo";
+export const ESTAGIO_DE_TRIAGEM = "titulo_resumo" as const;
+
 export type Decisao = "incluido" | "excluido" | "pendente" | "duvida";
 
 export interface EstudoParaTriagem {
@@ -45,10 +46,7 @@ export function listarCriteriosDeExclusao(protocoloId: string): CriterioDeExclus
     .all();
 }
 
-export function listarEstudosParaTriagem(
-  protocoloId: string,
-  estagio: EstagioDeTriagem,
-): EstudoParaTriagem[] {
+export function listarEstudosParaTriagem(protocoloId: string): EstudoParaTriagem[] {
   return db
     .select({
       id: estudo.id,
@@ -65,7 +63,10 @@ export function listarEstudosParaTriagem(
     .from(estudo)
     .leftJoin(
       triagem,
-      and(eq(triagem.estudoId, estudo.id), eq(triagem.estagio, estagio)),
+      and(
+        eq(triagem.estudoId, estudo.id),
+        eq(triagem.estagio, ESTAGIO_DE_TRIAGEM),
+      ),
     )
     .where(eq(estudo.protocoloId, protocoloId))
     .orderBy(estudo.criadoEm)
@@ -80,10 +81,7 @@ export interface ContagemPorDecisao {
   total: number;
 }
 
-export function contarPorDecisao(
-  protocoloId: string,
-  estagio: EstagioDeTriagem,
-): ContagemPorDecisao {
+export function contarPorDecisao(protocoloId: string): ContagemPorDecisao {
   const linhas = db
     .select({
       decisao: triagem.decisao,
@@ -92,7 +90,10 @@ export function contarPorDecisao(
     .from(estudo)
     .leftJoin(
       triagem,
-      and(eq(triagem.estudoId, estudo.id), eq(triagem.estagio, estagio)),
+      and(
+        eq(triagem.estudoId, estudo.id),
+        eq(triagem.estagio, ESTAGIO_DE_TRIAGEM),
+      ),
     )
     .where(eq(estudo.protocoloId, protocoloId))
     .groupBy(triagem.decisao)

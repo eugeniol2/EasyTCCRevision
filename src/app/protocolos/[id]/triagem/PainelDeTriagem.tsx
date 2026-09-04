@@ -5,7 +5,6 @@ import { formatarAutores } from "@/lib/bibtex/autores";
 import type {
   CriterioDeExclusao,
   Decisao,
-  EstagioDeTriagem,
   EstudoParaTriagem,
 } from "@/lib/consultas";
 import { desfazerDecisao, registrarDecisao } from "./acoes";
@@ -32,7 +31,6 @@ const CLASSE_DO_SELO: Record<Decisao, string> = {
 
 interface Props {
   protocoloId: string;
-  estagio: EstagioDeTriagem;
   estudos: EstudoParaTriagem[];
   criterios: CriterioDeExclusao[];
 }
@@ -53,7 +51,6 @@ function primeiroPendente(estudos: EstudoParaTriagem[]): number {
 
 export default function PainelDeTriagem({
   protocoloId,
-  estagio,
   estudos,
   criterios,
 }: Props) {
@@ -69,6 +66,11 @@ export default function PainelDeTriagem({
 
   const estudoAtual = estudos[indiceAtual];
 
+  const porId = useMemo(
+    () => new Map(estudos.map((estudo) => [estudo.id, estudo])),
+    [estudos],
+  );
+
   const contagem = useMemo(() => {
     const totais = { incluido: 0, excluido: 0, duvida: 0, pendente: 0 };
     for (const estudo of estudos) {
@@ -78,12 +80,24 @@ export default function PainelDeTriagem({
     return totais;
   }, [estudos, decisoes]);
 
+  const incluidos = useMemo(
+    () =>
+      [...decisoes.entries()]
+        .filter(([, decisao]) => decisao === "incluido")
+        .map(([id]) => porId.get(id))
+        .filter((estudo): estudo is EstudoParaTriagem => estudo !== undefined)
+        .reverse(),
+    [decisoes, porId],
+  );
+
   const irParaProximoPendente = useCallback(
     (aPartirDe: number) => {
       const proximo = estudos.findIndex(
         (estudo, indice) => indice > aPartirDe && !decisoes.has(estudo.id),
       );
-      setIndiceAtual(proximo === -1 ? Math.min(aPartirDe + 1, estudos.length - 1) : proximo);
+      setIndiceAtual(
+        proximo === -1 ? Math.min(aPartirDe + 1, estudos.length - 1) : proximo,
+      );
     },
     [estudos, decisoes],
   );
@@ -92,37 +106,38 @@ export default function PainelDeTriagem({
     (decisao: Decisao, criterioId: string | null) => {
       if (!estudoAtual) return;
 
-      setDecisoes((anteriores) =>
-        new Map(anteriores).set(estudoAtual.id, decisao),
-      );
+      setDecisoes((anteriores) => new Map(anteriores).set(estudoAtual.id, decisao));
       void registrarDecisao({
         protocoloId,
         estudoId: estudoAtual.id,
-        estagio,
         decisao,
         criterioId,
       });
       irParaProximoPendente(indiceAtual);
     },
-    [estudoAtual, protocoloId, estagio, indiceAtual, irParaProximoPendente],
+    [estudoAtual, protocoloId, indiceAtual, irParaProximoPendente],
   );
 
-  const desfazer = useCallback(() => {
-    if (!estudoAtual) return;
+  const retirarDecisao = useCallback(
+    (estudoId: string) => {
+      setDecisoes((anteriores) => {
+        const atualizadas = new Map(anteriores);
+        atualizadas.delete(estudoId);
+        return atualizadas;
+      });
+      void desfazerDecisao(protocoloId, estudoId);
+    },
+    [protocoloId],
+  );
 
-    setDecisoes((anteriores) => {
-      const atualizadas = new Map(anteriores);
-      atualizadas.delete(estudoAtual.id);
-      return atualizadas;
-    });
-    void desfazerDecisao(protocoloId, estudoAtual.id, estagio);
-  }, [estudoAtual, protocoloId, estagio]);
+  const desfazerAtual = useCallback(() => {
+    if (estudoAtual) retirarDecisao(estudoAtual.id);
+  }, [estudoAtual, retirarDecisao]);
 
   useEffect(() => {
     function aoTeclar(evento: KeyboardEvent) {
       const alvo = evento.target as HTMLElement | null;
-      const estaDigitando =
-        alvo?.tagName === "INPUT" || alvo?.tagName === "TEXTAREA";
+      const estaDigitando = alvo?.tagName === "INPUT" || alvo?.tagName === "TEXTAREA";
       if (estaDigitando || evento.metaKey || evento.ctrlKey || evento.altKey) return;
 
       const tecla = evento.key.toLowerCase();
@@ -139,7 +154,7 @@ export default function PainelDeTriagem({
       }
       if (tecla === TECLA_DESFAZER) {
         evento.preventDefault();
-        desfazer();
+        desfazerAtual();
         return;
       }
       if (evento.key === TECLA_ANTERIOR) {
@@ -163,7 +178,7 @@ export default function PainelDeTriagem({
 
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [decidir, desfazer, criterios, estudos.length]);
+  }, [decidir, desfazerAtual, criterios, estudos.length]);
 
   if (estudos.length === 0) {
     return (
@@ -176,20 +191,58 @@ export default function PainelDeTriagem({
     );
   }
 
-  if (!estudoAtual) return null;
-
-  const decisaoAtual = decisoes.get(estudoAtual.id) ?? "pendente";
   const decididos = estudos.length - contagem.pendente;
   const percentual = Math.round((decididos / estudos.length) * 100);
 
   return (
     <>
-      <div className="contadores">
+      {incluidos.length > 0 && (
+        <section className="cartao incluidos">
+          <div className="incluidos-topo">
+            <h2>
+              Incluídos <span className="selo selo-incluido">{incluidos.length}</span>
+            </h2>
+            <span className="subtitulo">clique para revisitar</span>
+          </div>
+
+          <div className="incluidos-rolagem">
+            <table className="tabela">
+              <tbody>
+                {incluidos.map((estudo) => (
+                  <tr key={estudo.id} className="linha-incluido">
+                    <td>
+                      <button
+                        type="button"
+                        className="link-estudo"
+                        onClick={() =>
+                          setIndiceAtual(estudos.findIndex((e) => e.id === estudo.id))
+                        }
+                      >
+                        {estudo.titulo}
+                      </button>
+                      <div className="subtitulo">{descreverEstudo(estudo)}</div>
+                    </td>
+                    <td style={{ width: "1%", whiteSpace: "nowrap" }}>
+                      <button
+                        type="button"
+                        className="botao-retirar"
+                        title="Retirar da lista"
+                        onClick={() => retirarDecisao(estudo.id)}
+                      >
+                        ×
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
+      <div className="contadores" style={{ marginTop: incluidos.length > 0 ? "1.25rem" : 0 }}>
         <span>
-          Estudo <strong>{indiceAtual + 1}</strong> de <strong>{estudos.length}</strong>
-        </span>
-        <span>
-          Incluídos <strong>{contagem.incluido}</strong>
+          Restam <strong>{contagem.pendente}</strong> de <strong>{estudos.length}</strong>
         </span>
         <span>
           Excluídos <strong>{contagem.excluido}</strong>
@@ -197,99 +250,114 @@ export default function PainelDeTriagem({
         <span>
           Em dúvida <strong>{contagem.duvida}</strong>
         </span>
-        <span>
-          Pendentes <strong>{contagem.pendente}</strong>
-        </span>
       </div>
 
       <div className="barra-progresso">
         <div style={{ width: `${percentual}%` }} />
       </div>
 
-      <article className="cartao">
-        {decisaoAtual !== "pendente" && (
-          <p>
-            <span className={`selo ${CLASSE_DO_SELO[decisaoAtual]}`}>
-              {ROTULO_DA_DECISAO[decisaoAtual]}
-            </span>
-          </p>
-        )}
-
-        <h2 className="estudo-titulo">{estudoAtual.titulo}</h2>
-        <p className="estudo-meta">
-          {descreverEstudo(estudoAtual)}
-          {estudoAtual.url && (
-            <>
-              {" · "}
-              <a href={estudoAtual.url} target="_blank" rel="noopener noreferrer">
-                {estudoAtual.doi ?? "abrir"}
-              </a>
-            </>
-          )}
-        </p>
-
-        {estudoAtual.resumo ? (
-          <div className="estudo-resumo">{estudoAtual.resumo}</div>
-        ) : (
-          <div className="estudo-resumo">
-            <em>Sem resumo no registro importado.</em>
-          </div>
-        )}
-
-        <div className="linha-acoes">
-          <button
-            type="button"
-            className="botao botao-primario"
-            onClick={() => decidir("incluido", null)}
-          >
-            Incluir <kbd>I</kbd>
-          </button>
-          <button
-            type="button"
-            className="botao"
-            onClick={() => decidir("duvida", null)}
-          >
-            Em dúvida <kbd>D</kbd>
-          </button>
-          <button type="button" className="botao" onClick={desfazer}>
-            Desfazer <kbd>U</kbd>
-          </button>
-        </div>
-
-        <div className="criterios">
-          {criterios.map((criterioDeExclusao, posicao) => (
-            <button
-              type="button"
-              key={criterioDeExclusao.id}
-              className="criterio"
-              onClick={() => decidir("excluido", criterioDeExclusao.id)}
-            >
-              <kbd>{posicao + 1}</kbd>
-              <span>
-                <strong>{criterioDeExclusao.codigo}</strong> — {criterioDeExclusao.descricao}
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="atalhos">
-          <span>
-            <kbd>I</kbd> incluir
-          </span>
-          <span>
-            <kbd>1</kbd>–<kbd>{criterios.length}</kbd> excluir pelo critério
-          </span>
-          <span>
-            <kbd>D</kbd> dúvida
-          </span>
-          <span>
-            <kbd>U</kbd> desfazer
-          </span>
-          <span>
-            <kbd>←</kbd> <kbd>→</kbd> navegar
-          </span>
-        </div>
-      </article>
+      {estudoAtual && <ArtigoEmTriagem
+        estudo={estudoAtual}
+        decisao={decisoes.get(estudoAtual.id) ?? "pendente"}
+        criterios={criterios}
+        onDecidir={decidir}
+        onDesfazer={desfazerAtual}
+      />}
     </>
+  );
+}
+
+interface PropsDoArtigo {
+  estudo: EstudoParaTriagem;
+  decisao: Decisao;
+  criterios: CriterioDeExclusao[];
+  onDecidir: (decisao: Decisao, criterioId: string | null) => void;
+  onDesfazer: () => void;
+}
+
+function ArtigoEmTriagem({
+  estudo,
+  decisao,
+  criterios,
+  onDecidir,
+  onDesfazer,
+}: PropsDoArtigo) {
+  return (
+    <article className="cartao">
+      {decisao !== "pendente" && (
+        <p>
+          <span className={`selo ${CLASSE_DO_SELO[decisao]}`}>
+            {ROTULO_DA_DECISAO[decisao]}
+          </span>
+        </p>
+      )}
+
+      <h2 className="estudo-titulo">{estudo.titulo}</h2>
+      <p className="estudo-meta">
+        {descreverEstudo(estudo)}
+        {estudo.url && (
+          <>
+            {" · "}
+            <a href={estudo.url} target="_blank" rel="noopener noreferrer">
+              {estudo.doi ?? "abrir"}
+            </a>
+          </>
+        )}
+      </p>
+
+      <div className="estudo-resumo">
+        {estudo.resumo ?? <em>Sem resumo no registro importado.</em>}
+      </div>
+
+      <div className="linha-acoes">
+        <button
+          type="button"
+          className="botao botao-primario"
+          onClick={() => onDecidir("incluido", null)}
+        >
+          Incluir <kbd>I</kbd>
+        </button>
+        <button type="button" className="botao" onClick={() => onDecidir("duvida", null)}>
+          Em dúvida <kbd>D</kbd>
+        </button>
+        <button type="button" className="botao" onClick={onDesfazer}>
+          Desfazer <kbd>U</kbd>
+        </button>
+      </div>
+
+      <div className="criterios">
+        {criterios.map((criterioDeExclusao, posicao) => (
+          <button
+            type="button"
+            key={criterioDeExclusao.id}
+            className="criterio"
+            onClick={() => onDecidir("excluido", criterioDeExclusao.id)}
+          >
+            <kbd>{posicao + 1}</kbd>
+            <span>
+              <strong>{criterioDeExclusao.codigo}</strong> — {criterioDeExclusao.descricao}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <div className="atalhos">
+        <span>
+          <kbd>I</kbd> incluir
+        </span>
+        <span>
+          <kbd>1</kbd>–<kbd>{criterios.length}</kbd> excluir pelo critério
+        </span>
+        <span>
+          <kbd>D</kbd> dúvida
+        </span>
+        <span>
+          <kbd>U</kbd> desfazer
+        </span>
+        <span>
+          <kbd>←</kbd> <kbd>→</kbd> navegar
+        </span>
+      </div>
+    </article>
   );
 }

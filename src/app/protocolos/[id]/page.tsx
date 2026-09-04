@@ -17,7 +17,7 @@ export default async function PaginaDoProtocolo({
   const protocolo = buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const contagem = contarPorDecisao(id, "titulo_resumo");
+  const contagem = contarPorDecisao(id);
   const buscas = db.select().from(busca).where(eq(busca.protocoloId, id)).all();
 
   return (
@@ -33,7 +33,7 @@ export default async function PaginaDoProtocolo({
       </header>
 
       <section className="cartao">
-        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Triagem por título e resumo</h2>
+        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Triagem</h2>
         <div className="contadores">
           <span>
             Total <strong>{contagem.total}</strong>

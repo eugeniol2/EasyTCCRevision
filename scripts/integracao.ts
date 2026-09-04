@@ -148,7 +148,7 @@ const daIeee = importarParaOProtocolo({
 checar("só o inédito entra", daIeee.importados, 1);
 checar("repetido é reconhecido pelo DOI", daIeee.jaExistiamNoProtocolo, 1);
 
-const todosOsEstudos = listarEstudosParaTriagem(protocoloId, "titulo_resumo");
+const todosOsEstudos = listarEstudosParaTriagem(protocoloId);
 checar("total sem duplicata", todosOsEstudos.length, 4);
 
 const vinculos = db.select().from(estudoBusca).all();
@@ -187,24 +187,21 @@ checar("critérios de exclusão listados", criterios.length, 2);
 
 salvarDecisao({
   estudoId: todosOsEstudos[0]!.id,
-  estagio: "titulo_resumo",
   decisao: "incluido",
   criterioId: null,
 });
 salvarDecisao({
   estudoId: todosOsEstudos[1]!.id,
-  estagio: "titulo_resumo",
   decisao: "excluido",
   criterioId: criterios[0]!.id,
 });
 salvarDecisao({
   estudoId: todosOsEstudos[2]!.id,
-  estagio: "titulo_resumo",
   decisao: "duvida",
   criterioId: null,
 });
 
-const contagem = contarPorDecisao(protocoloId, "titulo_resumo");
+const contagem = contarPorDecisao(protocoloId);
 checar("incluídos", contagem.incluido, 1);
 checar("excluídos", contagem.excluido, 1);
 checar("em dúvida", contagem.duvida, 1);
@@ -213,21 +210,35 @@ checar("total", contagem.total, 4);
 
 salvarDecisao({
   estudoId: todosOsEstudos[0]!.id,
-  estagio: "titulo_resumo",
   decisao: "excluido",
   criterioId: criterios[1]!.id,
 });
-const aposMudarDeIdeia = contarPorDecisao(protocoloId, "titulo_resumo");
+const aposMudarDeIdeia = contarPorDecisao(protocoloId);
 checar("decisão substituída, não duplicada", aposMudarDeIdeia.total, 4);
 checar("passou a contar como excluído", aposMudarDeIdeia.excluido, 2);
 checar("não é mais incluído", aposMudarDeIdeia.incluido, 0);
 
-removerDecisao(todosOsEstudos[0]!.id, "titulo_resumo");
-const aposDesfazer = contarPorDecisao(protocoloId, "titulo_resumo");
+removerDecisao(todosOsEstudos[0]!.id);
+const aposDesfazer = contarPorDecisao(protocoloId);
 checar("desfazer devolve para pendente", aposDesfazer.pendente, 2);
 
-const noTextoCompleto = contarPorDecisao(protocoloId, "texto_completo");
-checar("estágios são independentes", noTextoCompleto.pendente, 4);
+console.log("\nLista de incluídos");
+salvarDecisao({ estudoId: todosOsEstudos[0]!.id, decisao: "incluido", criterioId: null });
+salvarDecisao({ estudoId: todosOsEstudos[3]!.id, decisao: "incluido", criterioId: null });
+
+const comDecisoes = listarEstudosParaTriagem(protocoloId);
+const listaDeIncluidos = comDecisoes.filter((e) => e.decisao === "incluido");
+checar("dois incluídos na lista", listaDeIncluidos.length, 2);
+checar(
+  "retirar da lista devolve para pendente",
+  (() => {
+    removerDecisao(todosOsEstudos[3]!.id);
+    return listarEstudosParaTriagem(protocoloId).filter(
+      (e) => e.decisao === "incluido",
+    ).length;
+  })(),
+  1,
+);
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,
