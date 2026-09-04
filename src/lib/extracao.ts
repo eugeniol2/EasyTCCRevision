@@ -14,6 +14,12 @@ export interface CampoDeExtracao {
   ordem: number;
 }
 
+export const AVALIACAO_DE_QUALIDADE = {
+  nome: "Qualidade metodológica",
+  tipo: "opcoes" as TipoDeCampo,
+  opcoes: ["Alta", "Média", "Baixa"],
+};
+
 export const CAMPOS_PADRAO: { nome: string; tipo: TipoDeCampo }[] = [
   { nome: "Objetivo", tipo: "texto" },
   { nome: "Metodologia", tipo: "texto" },

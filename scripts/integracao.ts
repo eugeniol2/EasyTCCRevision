@@ -85,6 +85,13 @@ const {
   removerCampo,
   salvarValorExtraido,
 } = await import("../src/lib/extracao");
+const {
+  listarEstudosIncluidos,
+  montarPrisma,
+  montarTabelaDeTrabalhos,
+  tabelaEmLatex,
+  textoDaMetodologia,
+} = await import("../src/lib/relatorio");
 const { busca, estudo, triagem } = await import("../src/db/schema");
 
 const ARTIGOS_DA_SCOPUS = String.raw`
@@ -571,6 +578,53 @@ checar(
   listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
   3,
 );
+
+console.log("");
+console.log("Sintese e exportacao");
+const prisma = montarPrisma(protocoloId);
+
+checar("triados batem com a fase 1", prisma.triados, contarPorDecisao(protocoloId, TRIAGEM_INICIAL).total);
+checar("fase 2 bate com o funil", prisma.avaliadosPorTextoCompleto, contarPorDecisao(protocoloId, LEITURA_COMPLETA).total);
+checar("incluidos batem com a extracao", prisma.incluidos, listarEstudosParaExtracao(protocoloId).length);
+checar(
+  "identificados nunca menor que triados",
+  prisma.identificados >= prisma.triados,
+  true,
+);
+checar(
+  "soma do funil fecha na fase 1",
+  prisma.excluidosNaTriagem + prisma.emDuvidaNaTriagem + prisma.pendentesNaTriagem + prisma.avaliadosPorTextoCompleto,
+  prisma.triados,
+);
+checar("buscas listadas", prisma.buscas.length > 0, true);
+
+const tabela = montarTabelaDeTrabalhos(protocoloId);
+checar("colunas da tabela", tabela.colunas, ["Objetivo", "Metodologia", "Resultados"]);
+checar(
+  "uma linha por estudo incluido",
+  tabela.linhas.length,
+  listarEstudosParaExtracao(protocoloId).length,
+);
+checar(
+  "cada linha tem uma celula por coluna",
+  tabela.linhas.every((l) => l.celulas.length === tabela.colunas.length),
+  true,
+);
+
+const incluidos = listarEstudosIncluidos(protocoloId);
+checar("lista de incluidos bate com o prisma", incluidos.length, prisma.incluidos);
+checar("estudo incluido tem titulo", incluidos[0]!.titulo.length > 0, true);
+checar("estudo incluido tem link", incluidos[0]!.url !== null, true);
+checar("autores vem formatados", incluidos[0]!.autores.length > 0, true);
+
+const latex = tabelaEmLatex(protocoloId, "Revisao & Teste");
+checar("latex abre o ambiente table", latex.includes(String.raw`\begin{table}`), true);
+checar("e comercial escapado no caption", latex.includes(String.raw`Revisao \& Teste`), true);
+
+const metodologia = textoDaMetodologia(protocoloId);
+checar("metodologia cita os incluidos", metodologia.includes(`${prisma.incluidos} estudo(s) compuseram`), true);
+checar("metodologia cita as bases", metodologia.includes("base(s) de dados"), true);
+
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,

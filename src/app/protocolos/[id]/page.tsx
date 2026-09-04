@@ -138,6 +138,9 @@ export default async function PaginaDoProtocolo({
           >
             Preencher extração
           </a>
+          <a className="botao" href={`/protocolos/${id}/relatorio`}>
+            Ver síntese e exportar
+          </a>
         </div>
       </section>
 

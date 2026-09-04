@@ -517,6 +517,96 @@ textarea {
   white-space: pre-wrap;
 }
 
+.rolagem-horizontal {
+  overflow-x: auto;
+  margin-top: 0.75rem;
+}
+
+.tabela-trabalhos td {
+  vertical-align: top;
+  min-width: 9rem;
+}
+
+.lista-incluidos {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 0.9rem;
+}
+
+.lista-incluidos li {
+  padding-left: 0.2rem;
+}
+
+.titulo-incluido {
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.lista-incluidos .subtitulo {
+  margin: 0.15rem 0 0.15rem;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .imprimivel,
+  .imprimivel * {
+    visibility: visible;
+  }
+
+  .imprimivel {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    padding: 0;
+    background: #fff;
+    color: #000;
+  }
+
+  .imprimivel .sem-impressao {
+    display: none;
+  }
+
+  .imprimivel .tabela th,
+  .imprimivel .tabela td {
+    border-bottom: 1px solid #999;
+    color: #000;
+    font-size: 10pt;
+  }
+
+  .imprimivel .subtitulo {
+    color: #444;
+  }
+
+  .rolagem-horizontal {
+    overflow: visible;
+  }
+
+  @page {
+    margin: 1.5cm;
+  }
+}
+
+.saida {
+  background: var(--fundo);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 0.85rem 1rem;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  max-height: 22rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
 .campo-extraido {
   min-height: 0;
   font-family: var(--fonte);

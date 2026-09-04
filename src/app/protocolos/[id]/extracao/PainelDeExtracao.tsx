@@ -3,7 +3,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { formatarAutores } from "@/lib/bibtex/autores";
 import type { CampoDeExtracao, EstudoParaExtracao } from "@/lib/extracao";
-import { criarCampo, excluirCampo, salvarValor, usarCamposPadrao } from "./acoes";
+import {
+  criarAvaliacaoDeQualidade,
+  criarCampo,
+  excluirCampo,
+  salvarValor,
+  usarCamposPadrao,
+} from "./acoes";
 
 interface Props {
   protocoloId: string;
@@ -198,19 +204,37 @@ export default function PainelDeExtracao({
                     {campo.nome}
                     {estaSalvando && <span className="uso-criterio"> salvando...</span>}
                   </label>
-                  <textarea
-                    id={`campo-${campo.id}`}
-                    className="campo-extraido"
-                    rows={3}
-                    value={valor}
-                    placeholder={`${campo.nome} deste estudo`}
-                    onChange={(evento) =>
-                      alterar(estudoAtual.id, campo.id, evento.target.value)
-                    }
-                    onBlur={(evento) =>
-                      void gravar(estudoAtual.id, campo.id, evento.target.value)
-                    }
-                  />
+                  {campo.tipo === "opcoes" ? (
+                    <select
+                      id={`campo-${campo.id}`}
+                      value={valor}
+                      onChange={(evento) => {
+                        alterar(estudoAtual.id, campo.id, evento.target.value);
+                        void gravar(estudoAtual.id, campo.id, evento.target.value);
+                      }}
+                    >
+                      <option value="">Não avaliado</option>
+                      {(campo.opcoes ?? []).map((opcao) => (
+                        <option key={opcao} value={opcao}>
+                          {opcao}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <textarea
+                      id={`campo-${campo.id}`}
+                      className="campo-extraido"
+                      rows={3}
+                      value={valor}
+                      placeholder={`${campo.nome} deste estudo`}
+                      onChange={(evento) =>
+                        alterar(estudoAtual.id, campo.id, evento.target.value)
+                      }
+                      onBlur={(evento) =>
+                        void gravar(estudoAtual.id, campo.id, evento.target.value)
+                      }
+                    />
+                  )}
                 </div>
               );
             })}
@@ -224,8 +248,15 @@ export default function PainelDeExtracao({
         <div className="grade" style={{ gap: "0.4rem" }}>
           {campos.map((campo) => (
             <div key={campo.id} className="linha-criterio">
-              <span className="codigo-criterio">{campo.tipo}</span>
-              <span style={{ flex: 1 }}>{campo.nome}</span>
+              <span className="codigo-criterio">
+                {campo.tipo === "opcoes" ? "opções" : campo.tipo}
+              </span>
+              <span style={{ flex: 1 }}>
+                {campo.nome}
+                {campo.opcoes && (
+                  <span className="uso-criterio"> {campo.opcoes.join(" · ")}</span>
+                )}
+              </span>
               <button
                 type="button"
                 className="botao-retirar"
@@ -256,6 +287,15 @@ export default function PainelDeExtracao({
           >
             Adicionar coluna
           </button>
+          {!campos.some((campo) => campo.tipo === "opcoes") && (
+            <button
+              type="button"
+              className="botao"
+              onClick={() => void criarAvaliacaoDeQualidade(protocoloId)}
+            >
+              Adicionar avaliação de qualidade
+            </button>
+          )}
         </div>
       </section>
     </>
