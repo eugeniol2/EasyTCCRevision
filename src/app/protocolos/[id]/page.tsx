@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { busca } from "@/db/schema";
 import { buscarProtocolo, contarPorDecisao } from "@/lib/consultas";
-import BotaoZerarTriagem from "./BotaoZerarTriagem";
+import AcoesDoProtocolo from "./AcoesDoProtocolo";
 
 function formatarData(segundosUnix: number): string {
   return new Date(segundosUnix * 1000).toLocaleDateString("pt-BR");
@@ -59,7 +59,7 @@ export default async function PaginaDoProtocolo({
           <a className="botao" href={`/protocolos/${id}/importar`}>
             Importar .bib
           </a>
-          <BotaoZerarTriagem
+          <AcoesDoProtocolo
             protocoloId={id}
             decisoesTomadas={contagem.total - contagem.pendente}
             totalDeEstudos={contagem.total}

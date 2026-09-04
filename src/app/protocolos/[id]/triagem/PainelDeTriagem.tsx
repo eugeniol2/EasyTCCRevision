@@ -8,7 +8,7 @@ import type {
   Decisao,
   EstudoParaTriagem,
 } from "@/lib/consultas";
-import { desfazerDecisao, registrarDecisao } from "./acoes";
+import { descartarArtigo, desfazerDecisao, registrarDecisao } from "./acoes";
 
 const TECLA_INCLUIR = "i";
 const TECLA_DUVIDA = "d";
@@ -81,6 +81,7 @@ export default function PainelDeTriagem({
   const [indiceAtual, setIndiceAtual] = useState(() => primeiroPendente(estudos));
   const [grupoAberto, setGrupoAberto] = useState<Decisao | null>(null);
   const [remocaoPendente, setRemocaoPendente] = useState<string | null>(null);
+  const [descartePendente, setDescartePendente] = useState<string | null>(null);
 
   const estudoAtual = estudos[indiceAtual];
 
@@ -165,13 +166,25 @@ export default function PainelDeTriagem({
     if (estudoAtual) pedirRemocao(estudoAtual.id);
   }, [estudoAtual, pedirRemocao]);
 
+  useEffect(() => {
+    setIndiceAtual((indice) => Math.min(indice, Math.max(0, estudos.length - 1)));
+  }, [estudos.length]);
+
+  const confirmarDescarte = useCallback(() => {
+    const estudoId = descartePendente;
+    if (estudoId === null) return;
+
+    void descartarArtigo(protocoloId, estudoId);
+    setDescartePendente(null);
+  }, [descartePendente, protocoloId]);
+
   const irPara = useCallback((estudoId: string) => {
     setIndiceAtual(estudos.findIndex((estudo) => estudo.id === estudoId));
   }, [estudos]);
 
   useEffect(() => {
     function aoTeclar(evento: KeyboardEvent) {
-      if (remocaoPendente !== null) return;
+      if (remocaoPendente !== null || descartePendente !== null) return;
 
       const alvo = evento.target as HTMLElement | null;
       const estaDigitando = alvo?.tagName === "INPUT" || alvo?.tagName === "TEXTAREA";
@@ -215,7 +228,7 @@ export default function PainelDeTriagem({
 
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [decidir, desfazerAtual, criterios, estudos.length, remocaoPendente]);
+  }, [decidir, desfazerAtual, criterios, estudos.length, remocaoPendente, descartePendente]);
 
   if (estudos.length === 0) {
     return (
@@ -360,6 +373,23 @@ export default function PainelDeTriagem({
         </DialogoDeConfirmacao>
       )}
 
+      {descartePendente !== null && (
+        <DialogoDeConfirmacao
+          titulo="Descartar este artigo?"
+          rotuloConfirmar="Descartar"
+          onConfirmar={confirmarDescarte}
+          onCancelar={() => setDescartePendente(null)}
+        >
+          <p className="modal-corpo">
+            O artigo sai do protocolo junto com sua decisão de triagem. Não dá
+            para desfazer — só reimportando o .bib.
+          </p>
+          <div className="modal-estudo">
+            <p>{estudos.find((estudo) => estudo.id === descartePendente)?.titulo}</p>
+          </div>
+        </DialogoDeConfirmacao>
+      )}
+
       {estudoAtual && (
         <ArtigoEmTriagem
           estudo={estudoAtual}
@@ -372,6 +402,7 @@ export default function PainelDeTriagem({
           criterios={criterios}
           onDecidir={decidir}
           onDesfazer={desfazerAtual}
+          onDescartar={() => setDescartePendente(estudoAtual.id)}
         />
       )}
     </>
@@ -385,6 +416,7 @@ interface PropsDoArtigo {
   criterios: CriterioDeExclusao[];
   onDecidir: (decisao: Decisao, criterioId: string | null) => void;
   onDesfazer: () => void;
+  onDescartar: () => void;
 }
 
 function ArtigoEmTriagem({
@@ -394,6 +426,7 @@ function ArtigoEmTriagem({
   criterios,
   onDecidir,
   onDesfazer,
+  onDescartar,
 }: PropsDoArtigo) {
   return (
     <article className="cartao">
@@ -441,6 +474,13 @@ function ArtigoEmTriagem({
           onClick={onDesfazer}
         >
           Desfazer <kbd>U</kbd>
+        </button>
+        <button
+          type="button"
+          className="botao botao-perigo-suave botao-a-direita"
+          onClick={onDescartar}
+        >
+          Descartar artigo
         </button>
       </div>
 

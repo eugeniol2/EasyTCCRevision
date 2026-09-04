@@ -66,6 +66,9 @@ const { contarPorDecisao, listarCriteriosDeExclusao, listarEstudosParaTriagem } 
 const { importarParaOProtocolo } = await import("../src/lib/importacao");
 const { removerDecisao, removerTodasAsDecisoes, salvarDecisao } =
   await import("../src/lib/triagem");
+const { descartarEstudo, descartarTudoDoProtocolo } =
+  await import("../src/lib/estudos");
+const { busca, estudo, triagem } = await import("../src/db/schema");
 
 const ARTIGOS_DA_SCOPUS = String.raw`
 @article{silva2023,
@@ -267,6 +270,55 @@ checar("tudo volta a pendente", aposZerar.pendente, aposZerar.total);
 checar("estudos permanecem", listarEstudosParaTriagem(protocoloId).length, 4);
 checar("protocolo vizinho nao e afetado", contarPorDecisao(outroProtocoloId).incluido, 1);
 checar("zerar de novo nao apaga nada", removerTodasAsDecisoes(protocoloId), 0);
+
+console.log("\nDescartar artigo");
+salvarDecisao({ estudoId: doOutroProtocolo[1]!.id, decisao: "duvida", criterioId: null });
+const alvo = doOutroProtocolo[1]!;
+const vinculosAntes = db.select().from(estudoBusca).all().length;
+
+checar("descarta um estudo", descartarEstudo(alvo.id), 1);
+checar(
+  "estudo some da lista",
+  listarEstudosParaTriagem(outroProtocoloId).some((e) => e.id === alvo.id),
+  false,
+);
+checar(
+  "decisao vai junto (cascade)",
+  db.select().from(triagem).all().some((t) => t.estudoId === alvo.id),
+  false,
+);
+checar(
+  "vinculo estudo-busca vai junto (cascade)",
+  db.select().from(estudoBusca).all().length < vinculosAntes,
+  true,
+);
+checar("descartar de novo nao apaga nada", descartarEstudo(alvo.id), 0);
+checar("busca permanece", db.select().from(busca).all().length > 0, true);
+
+console.log("\nDescartar tudo do protocolo");
+const estudosDoOutro = listarEstudosParaTriagem(outroProtocoloId).length;
+const buscasDoOutro = db.select().from(busca).all()
+  .filter((b) => b.protocoloId === outroProtocoloId).length;
+
+const descarte = descartarTudoDoProtocolo(outroProtocoloId);
+checar("remove os estudos", descarte.estudosRemovidos, estudosDoOutro);
+checar("remove as buscas", descarte.buscasRemovidas, buscasDoOutro);
+checar("protocolo fica vazio", contarPorDecisao(outroProtocoloId).total, 0);
+checar(
+  "criterios do protocolo permanecem",
+  listarCriteriosDeExclusao(protocoloId).length,
+  2,
+);
+checar(
+  "protocolo vizinho mantem seus estudos",
+  listarEstudosParaTriagem(protocoloId).length,
+  4,
+);
+checar(
+  "buscas do vizinho permanecem",
+  db.select().from(busca).all().filter((b) => b.protocoloId === protocoloId).length > 0,
+  true,
+);
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,

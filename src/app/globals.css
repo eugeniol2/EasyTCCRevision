@@ -354,6 +354,20 @@ textarea {
   color: rgba(255, 255, 255, 0.9);
 }
 
+.botao-perigo-suave {
+  color: var(--excluir);
+  border-color: var(--borda);
+}
+
+.botao-perigo-suave:hover:not(:disabled) {
+  border-color: var(--excluir);
+  background: var(--excluir-fundo);
+}
+
+.botao-a-direita {
+  margin-left: auto;
+}
+
 .area-arquivo {
   display: flex;
   align-items: center;

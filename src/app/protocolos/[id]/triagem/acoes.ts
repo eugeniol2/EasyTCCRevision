@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { descartarEstudo } from "@/lib/estudos";
 import type { Decisao } from "@/lib/consultas";
 import { removerDecisao, salvarDecisao } from "@/lib/triagem";
 
@@ -11,6 +12,11 @@ interface DecisaoRecebida {
   criterioId: string | null;
 }
 
+function revalidarTriagem(protocoloId: string): void {
+  revalidatePath(`/protocolos/${protocoloId}`);
+  revalidatePath(`/protocolos/${protocoloId}/triagem`);
+}
+
 export async function registrarDecisao({
   protocoloId,
   estudoId,
@@ -18,7 +24,7 @@ export async function registrarDecisao({
   criterioId,
 }: DecisaoRecebida): Promise<void> {
   salvarDecisao({ estudoId, decisao, criterioId });
-  revalidatePath(`/protocolos/${protocoloId}/triagem`);
+  revalidarTriagem(protocoloId);
 }
 
 export async function desfazerDecisao(
@@ -26,5 +32,13 @@ export async function desfazerDecisao(
   estudoId: string,
 ): Promise<void> {
   removerDecisao(estudoId);
-  revalidatePath(`/protocolos/${protocoloId}/triagem`);
+  revalidarTriagem(protocoloId);
+}
+
+export async function descartarArtigo(
+  protocoloId: string,
+  estudoId: string,
+): Promise<void> {
+  descartarEstudo(estudoId);
+  revalidarTriagem(protocoloId);
 }
