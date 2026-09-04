@@ -188,31 +188,26 @@ textarea {
   margin-bottom: 1.25rem;
 }
 
-.lista-grupo-topo {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.4rem;
-}
-
-.lista-grupo-topo h2 {
-  font-size: 1rem;
-  margin: 0;
-  font-weight: 600;
-}
-
-.lista-grupo-topo .subtitulo {
-  font-weight: 400;
-}
-
 .lista-rolagem {
   max-height: 18rem;
   overflow-y: auto;
 }
 
 .lista-rolagem .tabela td {
-  padding: 0.45rem 0.2rem;
+  padding: 0.5rem 0.2rem;
+}
+
+.celula-selo {
+  width: 1%;
+  white-space: nowrap;
+  padding-right: 0.75rem !important;
+  vertical-align: top;
+}
+
+.celula-acao {
+  width: 1%;
+  white-space: nowrap;
+  vertical-align: top;
 }
 
 .linha-estudo:last-child td {

@@ -30,11 +30,14 @@ const CLASSE_DO_SELO: Record<Decisao, string> = {
   pendente: "selo-pendente",
 };
 
-const GRUPOS: { chave: Decisao; rotulo: string }[] = [
-  { chave: "pendente", rotulo: "Pendentes" },
+type Filtro = "decididos" | Decisao;
+
+const FILTROS: { chave: Filtro; rotulo: string }[] = [
+  { chave: "decididos", rotulo: "Decididos" },
   { chave: "incluido", rotulo: "Incluídos" },
   { chave: "duvida", rotulo: "Em dúvida" },
   { chave: "excluido", rotulo: "Excluídos" },
+  { chave: "pendente", rotulo: "Pendentes" },
 ];
 
 interface DecisaoLocal {
@@ -79,7 +82,7 @@ export default function PainelDeTriagem({
       ),
   );
   const [indiceAtual, setIndiceAtual] = useState(() => primeiroPendente(estudos));
-  const [grupoAberto, setGrupoAberto] = useState<Decisao | null>(null);
+  const [filtro, setFiltro] = useState<Filtro>("decididos");
   const [remocaoPendente, setRemocaoPendente] = useState<string | null>(null);
   const [descartePendente, setDescartePendente] = useState<string | null>(null);
 
@@ -96,21 +99,42 @@ export default function PainelDeTriagem({
   );
 
   const contagem = useMemo(() => {
-    const totais: Record<Decisao, number> = {
+    const totais: Record<Filtro, number> = {
+      decididos: 0,
       incluido: 0,
       excluido: 0,
       duvida: 0,
       pendente: 0,
     };
-    for (const estudo of estudos) totais[decisaoDe(estudo.id)]++;
+    for (const estudo of estudos) {
+      const decisao = decisaoDe(estudo.id);
+      totais[decisao]++;
+      if (decisao !== "pendente") totais.decididos++;
+    }
     return totais;
   }, [estudos, decisaoDe]);
 
-  const estudosDoGrupo = useMemo(() => {
-    if (grupoAberto === null) return [];
-    const doGrupo = estudos.filter((estudo) => decisaoDe(estudo.id) === grupoAberto);
-    return grupoAberto === "pendente" ? doGrupo : doGrupo.reverse();
-  }, [estudos, grupoAberto, decisaoDe]);
+  const ordemDaDecisao = useMemo(() => {
+    const ordem = new Map<string, number>();
+    let posicao = 0;
+    for (const estudoId of decisoes.keys()) ordem.set(estudoId, posicao++);
+    return ordem;
+  }, [decisoes]);
+
+  const estudosFiltrados = useMemo(() => {
+    const doFiltro = estudos.filter((estudo) =>
+      filtro === "decididos"
+        ? decisaoDe(estudo.id) !== "pendente"
+        : decisaoDe(estudo.id) === filtro,
+    );
+
+    if (filtro === "pendente") return doFiltro;
+
+    return doFiltro.sort(
+      (um, outro) =>
+        (ordemDaDecisao.get(outro.id) ?? 0) - (ordemDaDecisao.get(um.id) ?? 0),
+    );
+  }, [estudos, filtro, decisaoDe, ordemDaDecisao]);
 
   const irParaProximoPendente = useCallback(
     (aPartirDe: number) => {
@@ -128,9 +152,11 @@ export default function PainelDeTriagem({
     (decisao: Decisao, criterioId: string | null) => {
       if (!estudoAtual) return;
 
-      setDecisoes((anteriores) =>
-        new Map(anteriores).set(estudoAtual.id, { decisao, criterioId }),
-      );
+      setDecisoes((anteriores) => {
+        const atualizadas = new Map(anteriores);
+        atualizadas.delete(estudoAtual.id);
+        return atualizadas.set(estudoAtual.id, { decisao, criterioId });
+      });
       void registrarDecisao({
         protocoloId,
         estudoId: estudoAtual.id,
@@ -178,9 +204,12 @@ export default function PainelDeTriagem({
     setDescartePendente(null);
   }, [descartePendente, protocoloId]);
 
-  const irPara = useCallback((estudoId: string) => {
-    setIndiceAtual(estudos.findIndex((estudo) => estudo.id === estudoId));
-  }, [estudos]);
+  const irPara = useCallback(
+    (estudoId: string) => {
+      setIndiceAtual(estudos.findIndex((estudo) => estudo.id === estudoId));
+    },
+    [estudos],
+  );
 
   useEffect(() => {
     function aoTeclar(evento: KeyboardEvent) {
@@ -228,7 +257,14 @@ export default function PainelDeTriagem({
 
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [decidir, desfazerAtual, criterios, estudos.length, remocaoPendente, descartePendente]);
+  }, [
+    decidir,
+    desfazerAtual,
+    criterios,
+    estudos.length,
+    remocaoPendente,
+    descartePendente,
+  ]);
 
   if (estudos.length === 0) {
     return (
@@ -241,46 +277,39 @@ export default function PainelDeTriagem({
     );
   }
 
-  const decididos = estudos.length - contagem.pendente;
-  const percentual = Math.round((decididos / estudos.length) * 100);
+  const percentual = Math.round(
+    ((estudos.length - contagem.pendente) / estudos.length) * 100,
+  );
 
   return (
     <>
       <nav className="filtros">
-        {GRUPOS.map(({ chave, rotulo }) => (
+        {FILTROS.map(({ chave, rotulo }) => (
           <button
             type="button"
             key={chave}
-            className={`filtro${grupoAberto === chave ? " filtro-ativo" : ""}`}
+            className={`filtro${filtro === chave ? " filtro-ativo" : ""}`}
             disabled={contagem[chave] === 0}
-            onClick={() => setGrupoAberto(grupoAberto === chave ? null : chave)}
+            onClick={() => setFiltro(chave)}
           >
             {rotulo} <strong>{contagem[chave]}</strong>
           </button>
         ))}
       </nav>
 
-      {grupoAberto !== null && (
-        <section className="cartao lista-grupo">
-          <div className="lista-grupo-topo">
-            <h2>
-              {GRUPOS.find((grupo) => grupo.chave === grupoAberto)?.rotulo}
-              <span className="subtitulo"> — clique para abrir</span>
-            </h2>
-            <button
-              type="button"
-              className="botao-retirar"
-              title="Fechar lista"
-              onClick={() => setGrupoAberto(null)}
-            >
-              ×
-            </button>
-          </div>
-
+      <section className="cartao lista-grupo">
+        {estudosFiltrados.length === 0 ? (
+          <p className="subtitulo" style={{ margin: 0 }}>
+            {filtro === "decididos"
+              ? "Nenhuma decisão ainda — comece pelo artigo abaixo."
+              : "Nenhum estudo neste grupo."}
+          </p>
+        ) : (
           <div className="lista-rolagem">
             <table className="tabela">
               <tbody>
-                {estudosDoGrupo.map((estudo) => {
+                {estudosFiltrados.map((estudo) => {
+                  const decisao = decisaoDe(estudo.id);
                   const criterioId = decisoes.get(estudo.id)?.criterioId;
                   return (
                     <tr
@@ -289,6 +318,12 @@ export default function PainelDeTriagem({
                         estudo.id === estudoAtual?.id ? " linha-atual" : ""
                       }`}
                     >
+                      <td className="celula-selo">
+                        <span className={`selo ${CLASSE_DO_SELO[decisao]}`}>
+                          {ROTULO_DA_DECISAO[decisao]}
+                          {criterioId ? ` · ${codigoDoCriterio.get(criterioId)}` : ""}
+                        </span>
+                      </td>
                       <td>
                         <button
                           type="button"
@@ -297,15 +332,10 @@ export default function PainelDeTriagem({
                         >
                           {estudo.titulo}
                         </button>
-                        <div className="subtitulo">
-                          {criterioId && (
-                            <strong>{codigoDoCriterio.get(criterioId)} · </strong>
-                          )}
-                          {descreverEstudo(estudo)}
-                        </div>
+                        <div className="subtitulo">{descreverEstudo(estudo)}</div>
                       </td>
-                      <td style={{ width: "1%", whiteSpace: "nowrap" }}>
-                        {grupoAberto !== "pendente" && (
+                      <td className="celula-acao">
+                        {decisao !== "pendente" && (
                           <button
                             type="button"
                             className="botao-retirar"
@@ -322,8 +352,8 @@ export default function PainelDeTriagem({
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+        )}
+      </section>
 
       <div className="barra-progresso">
         <div style={{ width: `${percentual}%` }} />
