@@ -68,6 +68,8 @@ const { removerDecisao, removerTodasAsDecisoes, salvarDecisao } =
   await import("../src/lib/triagem");
 const { descartarEstudo, descartarTudoDoProtocolo } =
   await import("../src/lib/estudos");
+const { atualizarProtocolo, listarCriteriosEditaveis, salvarCriterios } =
+  await import("../src/lib/protocolo");
 const { busca, estudo, triagem } = await import("../src/db/schema");
 
 const ARTIGOS_DA_SCOPUS = String.raw`
@@ -337,6 +339,77 @@ checar(
   "toda origem esta preenchida",
   comOrigem.every((e) => e.bases.length > 0),
   true,
+);
+
+console.log("");
+console.log("Protocolo e criterios");
+atualizarProtocolo(protocoloId, {
+  titulo: "Revisao renomeada",
+  questaoPesquisa: "Qual a pergunta?",
+  anoInicio: 2019,
+  anoFim: 2025,
+});
+const protocoloSalvo = db.select().from(protocolo).all()
+  .find((p) => p.id === protocoloId)!;
+checar("titulo atualizado", protocoloSalvo.titulo, "Revisao renomeada");
+checar("pergunta gravada", protocoloSalvo.questaoPesquisa, "Qual a pergunta?");
+checar("recorte gravado", [protocoloSalvo.anoInicio, protocoloSalvo.anoFim], [2019, 2025]);
+
+const criteriosOriginais = listarCriteriosEditaveis(protocoloId);
+checar("dois criterios existentes", criteriosOriginais.length, 2);
+
+const estudosVivos = listarEstudosParaTriagem(protocoloId);
+salvarDecisao({
+  estudoId: estudosVivos[0]!.id,
+  decisao: "excluido",
+  criterioId: criteriosOriginais[0]!.id,
+});
+
+const criteriosAntes = listarCriteriosEditaveis(protocoloId);
+checar(
+  "uso em exclusoes e contado",
+  criteriosAntes.find((c) => c.id === criteriosOriginais[0]!.id)!.usadoEmExclusoes,
+  1,
+);
+checar(
+  "criterio nao usado fica zerado",
+  criteriosAntes.find((c) => c.id === criteriosOriginais[1]!.id)!.usadoEmExclusoes,
+  0,
+);
+
+const resumo = salvarCriterios(protocoloId, [
+  { id: criteriosAntes[0]!.id, tipo: "exclusao", descricao: "Descricao editada" },
+  { id: null, tipo: "exclusao", descricao: "Criterio novo" },
+  { id: null, tipo: "inclusao", descricao: "Estudo primario" },
+]);
+checar("um removido", resumo.removidos, 1);
+checar("um atualizado", resumo.atualizados, 1);
+checar("dois criados", resumo.criados, 2);
+
+const criteriosDepois = listarCriteriosEditaveis(protocoloId);
+checar("total apos gravar", criteriosDepois.length, 3);
+checar(
+  "codigo do existente nao muda",
+  criteriosDepois.find((c) => c.id === criteriosAntes[0]!.id)!.codigo,
+  criteriosAntes[0]!.codigo,
+);
+checar(
+  "novo criterio de exclusao pega codigo livre",
+  criteriosDepois.find((c) => c.descricao === "Criterio novo")!.codigo,
+  "EC3",
+);
+checar(
+  "criterio de inclusao usa prefixo IC",
+  criteriosDepois.find((c) => c.descricao === "Estudo primario")!.codigo,
+  "IC1",
+);
+checar(
+  "descricao vazia e ignorada",
+  salvarCriterios(protocoloId, [
+    ...criteriosDepois.map((c) => ({ id: c.id, tipo: c.tipo, descricao: c.descricao })),
+    { id: null, tipo: "exclusao" as const, descricao: "   " },
+  ]).criados,
+  0,
 );
 
 console.log(

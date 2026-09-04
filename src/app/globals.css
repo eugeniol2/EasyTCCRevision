@@ -400,6 +400,34 @@ textarea {
   vertical-align: baseline;
 }
 
+.linha-anos {
+  display: flex;
+  gap: 1rem;
+}
+
+.linha-anos > div {
+  flex: 1;
+}
+
+.linha-criterio {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.codigo-criterio {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+  min-width: 2.6rem;
+}
+
+.uso-criterio {
+  font-size: 0.75rem;
+  color: var(--texto-suave);
+  white-space: nowrap;
+}
+
 .area-arquivo {
   display: flex;
   align-items: center;

@@ -26,11 +26,18 @@ export default async function PaginaDoProtocolo({
       <header className="cabecalho">
         <div>
           <h1>{protocolo.titulo}</h1>
-          <p className="subtitulo">{protocolo.questaoPesquisa}</p>
+          <p className="subtitulo">
+            {protocolo.questaoPesquisa ?? "Pergunta de pesquisa ainda não definida."}
+          </p>
         </div>
-        <a className="botao" href="/">
-          Todos os protocolos
-        </a>
+        <div className="linha-acoes" style={{ marginTop: 0 }}>
+          <a className="botao" href={`/protocolos/${id}/protocolo`}>
+            Editar protocolo
+          </a>
+          <a className="botao" href="/">
+            Todos os protocolos
+          </a>
+        </div>
       </header>
 
       <section className="cartao">
