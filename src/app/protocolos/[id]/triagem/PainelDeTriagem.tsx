@@ -26,8 +26,20 @@ const CLASSE_DO_SELO: Record<Decisao, string> = {
   incluido: "selo-incluido",
   excluido: "selo-excluido",
   duvida: "selo-duvida",
-  pendente: "",
+  pendente: "selo-pendente",
 };
+
+const GRUPOS: { chave: Decisao; rotulo: string }[] = [
+  { chave: "pendente", rotulo: "Pendentes" },
+  { chave: "incluido", rotulo: "Incluídos" },
+  { chave: "duvida", rotulo: "Em dúvida" },
+  { chave: "excluido", rotulo: "Excluídos" },
+];
+
+interface DecisaoLocal {
+  decisao: Decisao;
+  criterioId: string | null;
+}
 
 interface Props {
   protocoloId: string;
@@ -54,41 +66,48 @@ export default function PainelDeTriagem({
   estudos,
   criterios,
 }: Props) {
-  const [decisoes, setDecisoes] = useState<Map<string, Decisao>>(
+  const [decisoes, setDecisoes] = useState<Map<string, DecisaoLocal>>(
     () =>
       new Map(
         estudos
           .filter((estudo) => estudo.decisao !== null)
-          .map((estudo) => [estudo.id, estudo.decisao!]),
+          .map((estudo) => [
+            estudo.id,
+            { decisao: estudo.decisao!, criterioId: estudo.criterioId },
+          ]),
       ),
   );
   const [indiceAtual, setIndiceAtual] = useState(() => primeiroPendente(estudos));
+  const [grupoAberto, setGrupoAberto] = useState<Decisao | null>(null);
 
   const estudoAtual = estudos[indiceAtual];
 
-  const porId = useMemo(
-    () => new Map(estudos.map((estudo) => [estudo.id, estudo])),
-    [estudos],
+  const codigoDoCriterio = useMemo(
+    () => new Map(criterios.map((criterio) => [criterio.id, criterio.codigo])),
+    [criterios],
+  );
+
+  const decisaoDe = useCallback(
+    (estudoId: string): Decisao => decisoes.get(estudoId)?.decisao ?? "pendente",
+    [decisoes],
   );
 
   const contagem = useMemo(() => {
-    const totais = { incluido: 0, excluido: 0, duvida: 0, pendente: 0 };
-    for (const estudo of estudos) {
-      const decisao = decisoes.get(estudo.id) ?? "pendente";
-      totais[decisao as keyof typeof totais]++;
-    }
+    const totais: Record<Decisao, number> = {
+      incluido: 0,
+      excluido: 0,
+      duvida: 0,
+      pendente: 0,
+    };
+    for (const estudo of estudos) totais[decisaoDe(estudo.id)]++;
     return totais;
-  }, [estudos, decisoes]);
+  }, [estudos, decisaoDe]);
 
-  const incluidos = useMemo(
-    () =>
-      [...decisoes.entries()]
-        .filter(([, decisao]) => decisao === "incluido")
-        .map(([id]) => porId.get(id))
-        .filter((estudo): estudo is EstudoParaTriagem => estudo !== undefined)
-        .reverse(),
-    [decisoes, porId],
-  );
+  const estudosDoGrupo = useMemo(() => {
+    if (grupoAberto === null) return [];
+    const doGrupo = estudos.filter((estudo) => decisaoDe(estudo.id) === grupoAberto);
+    return grupoAberto === "pendente" ? doGrupo : doGrupo.reverse();
+  }, [estudos, grupoAberto, decisaoDe]);
 
   const irParaProximoPendente = useCallback(
     (aPartirDe: number) => {
@@ -106,7 +125,9 @@ export default function PainelDeTriagem({
     (decisao: Decisao, criterioId: string | null) => {
       if (!estudoAtual) return;
 
-      setDecisoes((anteriores) => new Map(anteriores).set(estudoAtual.id, decisao));
+      setDecisoes((anteriores) =>
+        new Map(anteriores).set(estudoAtual.id, { decisao, criterioId }),
+      );
       void registrarDecisao({
         protocoloId,
         estudoId: estudoAtual.id,
@@ -133,6 +154,10 @@ export default function PainelDeTriagem({
   const desfazerAtual = useCallback(() => {
     if (estudoAtual) retirarDecisao(estudoAtual.id);
   }, [estudoAtual, retirarDecisao]);
+
+  const irPara = useCallback((estudoId: string) => {
+    setIndiceAtual(estudos.findIndex((estudo) => estudo.id === estudoId));
+  }, [estudos]);
 
   useEffect(() => {
     function aoTeclar(evento: KeyboardEvent) {
@@ -196,73 +221,127 @@ export default function PainelDeTriagem({
 
   return (
     <>
-      {incluidos.length > 0 && (
-        <section className="cartao incluidos">
-          <div className="incluidos-topo">
+      <nav className="filtros">
+        {GRUPOS.map(({ chave, rotulo }) => (
+          <button
+            type="button"
+            key={chave}
+            className={`filtro${grupoAberto === chave ? " filtro-ativo" : ""}`}
+            disabled={contagem[chave] === 0}
+            onClick={() => setGrupoAberto(grupoAberto === chave ? null : chave)}
+          >
+            {rotulo} <strong>{contagem[chave]}</strong>
+          </button>
+        ))}
+      </nav>
+
+      {grupoAberto !== null && (
+        <section className="cartao lista-grupo">
+          <div className="lista-grupo-topo">
             <h2>
-              Incluídos <span className="selo selo-incluido">{incluidos.length}</span>
+              {GRUPOS.find((grupo) => grupo.chave === grupoAberto)?.rotulo}
+              <span className="subtitulo"> — clique para abrir</span>
             </h2>
-            <span className="subtitulo">clique para revisitar</span>
+            <button
+              type="button"
+              className="botao-retirar"
+              title="Fechar lista"
+              onClick={() => setGrupoAberto(null)}
+            >
+              ×
+            </button>
           </div>
 
-          <div className="incluidos-rolagem">
+          <div className="lista-rolagem">
             <table className="tabela">
               <tbody>
-                {incluidos.map((estudo) => (
-                  <tr key={estudo.id} className="linha-incluido">
-                    <td>
-                      <button
-                        type="button"
-                        className="link-estudo"
-                        onClick={() =>
-                          setIndiceAtual(estudos.findIndex((e) => e.id === estudo.id))
-                        }
-                      >
-                        {estudo.titulo}
-                      </button>
-                      <div className="subtitulo">{descreverEstudo(estudo)}</div>
-                    </td>
-                    <td style={{ width: "1%", whiteSpace: "nowrap" }}>
-                      <button
-                        type="button"
-                        className="botao-retirar"
-                        title="Retirar da lista"
-                        onClick={() => retirarDecisao(estudo.id)}
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {estudosDoGrupo.map((estudo) => {
+                  const criterioId = decisoes.get(estudo.id)?.criterioId;
+                  return (
+                    <tr
+                      key={estudo.id}
+                      className={`linha-estudo${
+                        estudo.id === estudoAtual?.id ? " linha-atual" : ""
+                      }`}
+                    >
+                      <td>
+                        <button
+                          type="button"
+                          className="link-estudo"
+                          onClick={() => irPara(estudo.id)}
+                        >
+                          {estudo.titulo}
+                        </button>
+                        <div className="subtitulo">
+                          {criterioId && (
+                            <strong>{codigoDoCriterio.get(criterioId)} · </strong>
+                          )}
+                          {descreverEstudo(estudo)}
+                        </div>
+                      </td>
+                      <td style={{ width: "1%", whiteSpace: "nowrap" }}>
+                        {grupoAberto !== "pendente" && (
+                          <button
+                            type="button"
+                            className="botao-retirar"
+                            title="Voltar para pendente"
+                            onClick={() => retirarDecisao(estudo.id)}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </section>
       )}
 
-      <div className="contadores" style={{ marginTop: incluidos.length > 0 ? "1.25rem" : 0 }}>
-        <span>
-          Restam <strong>{contagem.pendente}</strong> de <strong>{estudos.length}</strong>
-        </span>
-        <span>
-          Excluídos <strong>{contagem.excluido}</strong>
-        </span>
-        <span>
-          Em dúvida <strong>{contagem.duvida}</strong>
-        </span>
-      </div>
-
       <div className="barra-progresso">
         <div style={{ width: `${percentual}%` }} />
       </div>
 
-      {estudoAtual && <ArtigoEmTriagem
-        estudo={estudoAtual}
-        decisao={decisoes.get(estudoAtual.id) ?? "pendente"}
-        criterios={criterios}
-        onDecidir={decidir}
-        onDesfazer={desfazerAtual}
-      />}
+      <div className="navegacao">
+        <button
+          type="button"
+          className="botao"
+          disabled={indiceAtual === 0}
+          onClick={() => setIndiceAtual((indice) => Math.max(0, indice - 1))}
+        >
+          ← Anterior
+        </button>
+        <span className="posicao">
+          Estudo <strong>{indiceAtual + 1}</strong> de <strong>{estudos.length}</strong>
+        </span>
+        <button
+          type="button"
+          className="botao"
+          disabled={indiceAtual === estudos.length - 1}
+          onClick={() =>
+            setIndiceAtual((indice) => Math.min(estudos.length - 1, indice + 1))
+          }
+        >
+          Próximo →
+        </button>
+      </div>
+
+      {estudoAtual && (
+        <ArtigoEmTriagem
+          estudo={estudoAtual}
+          decisao={decisaoDe(estudoAtual.id)}
+          criterioAplicado={
+            decisoes.get(estudoAtual.id)?.criterioId
+              ? codigoDoCriterio.get(decisoes.get(estudoAtual.id)!.criterioId!)
+              : undefined
+          }
+          criterios={criterios}
+          onDecidir={decidir}
+          onDesfazer={desfazerAtual}
+        />
+      )}
     </>
   );
 }
@@ -270,6 +349,7 @@ export default function PainelDeTriagem({
 interface PropsDoArtigo {
   estudo: EstudoParaTriagem;
   decisao: Decisao;
+  criterioAplicado: string | undefined;
   criterios: CriterioDeExclusao[];
   onDecidir: (decisao: Decisao, criterioId: string | null) => void;
   onDesfazer: () => void;
@@ -278,6 +358,7 @@ interface PropsDoArtigo {
 function ArtigoEmTriagem({
   estudo,
   decisao,
+  criterioAplicado,
   criterios,
   onDecidir,
   onDesfazer,
@@ -288,6 +369,7 @@ function ArtigoEmTriagem({
         <p>
           <span className={`selo ${CLASSE_DO_SELO[decisao]}`}>
             {ROTULO_DA_DECISAO[decisao]}
+            {criterioAplicado ? ` · ${criterioAplicado}` : ""}
           </span>
         </p>
       )}
@@ -320,7 +402,12 @@ function ArtigoEmTriagem({
         <button type="button" className="botao" onClick={() => onDecidir("duvida", null)}>
           Em dúvida <kbd>D</kbd>
         </button>
-        <button type="button" className="botao" onClick={onDesfazer}>
+        <button
+          type="button"
+          className="botao"
+          disabled={decisao === "pendente"}
+          onClick={onDesfazer}
+        >
           Desfazer <kbd>U</kbd>
         </button>
       </div>
