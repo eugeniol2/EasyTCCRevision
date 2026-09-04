@@ -65,6 +65,7 @@ const {
   contarPorDecisao,
   LEITURA_COMPLETA,
   listarCriteriosDeExclusao,
+  listarCriteriosDeInclusao,
   listarEstudosParaEstagio,
   TRIAGEM_INICIAL,
 } = await import("../src/lib/consultas");
@@ -468,6 +469,25 @@ checar(
   "tirar da fase 1 remove da fase 2",
   listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA).length,
   1,
+);
+
+console.log("");
+console.log("Criterios por tipo");
+const deExclusao = listarCriteriosDeExclusao(protocoloId);
+const deInclusao = listarCriteriosDeInclusao(protocoloId);
+
+checar("exclusao traz so tipo exclusao", deExclusao.length, 2);
+checar("inclusao traz so tipo inclusao", deInclusao.length, 1);
+checar("inclusao usa prefixo IC", deInclusao[0]!.codigo, "IC1");
+checar(
+  "as listas nao se misturam",
+  deExclusao.some((c) => deInclusao.some((i) => i.id === c.id)),
+  false,
+);
+checar(
+  "todo criterio de exclusao usa prefixo EC",
+  deExclusao.every((c) => c.codigo.startsWith("EC")),
+  true,
 );
 
 console.log(

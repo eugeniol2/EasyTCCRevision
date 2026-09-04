@@ -5,7 +5,7 @@ import DialogoDeConfirmacao from "@/app/componentes/DialogoDeConfirmacao";
 import { formatarAutores } from "@/lib/bibtex/autores";
 import { formatarMes } from "@/lib/publicacao";
 import type {
-  CriterioDeExclusao,
+  CriterioDoProtocolo,
   Decisao,
   EstagioDeTriagem,
   EstudoParaTriagem,
@@ -51,7 +51,8 @@ interface Props {
   protocoloId: string;
   estagio: EstagioDeTriagem;
   estudos: EstudoParaTriagem[];
-  criterios: CriterioDeExclusao[];
+  criterios: CriterioDoProtocolo[];
+  criteriosDeInclusao: CriterioDoProtocolo[];
 }
 
 function descreverEstudo(estudo: EstudoParaTriagem): string {
@@ -104,6 +105,7 @@ export default function PainelDeTriagem({
   estagio,
   estudos,
   criterios,
+  criteriosDeInclusao,
 }: Props) {
   const [decisoes, setDecisoes] = useState<Map<string, DecisaoLocal>>(
     () =>
@@ -492,6 +494,7 @@ export default function PainelDeTriagem({
               : undefined
           }
           criterios={criterios}
+          criteriosDeInclusao={criteriosDeInclusao}
           onDecidir={decidir}
           onDesfazer={desfazerAtual}
           onDescartar={() => setDescartePendente(estudoAtual.id)}
@@ -505,7 +508,8 @@ interface PropsDoArtigo {
   estudo: EstudoParaTriagem;
   decisao: Decisao;
   criterioAplicado: string | undefined;
-  criterios: CriterioDeExclusao[];
+  criterios: CriterioDoProtocolo[];
+  criteriosDeInclusao: CriterioDoProtocolo[];
   onDecidir: (decisao: Decisao, criterioId: string | null) => void;
   onDesfazer: () => void;
   onDescartar: () => void;
@@ -516,6 +520,7 @@ function ArtigoEmTriagem({
   decisao,
   criterioAplicado,
   criterios,
+  criteriosDeInclusao,
   onDecidir,
   onDesfazer,
   onDescartar,
@@ -577,6 +582,19 @@ function ArtigoEmTriagem({
         {estudo.resumo ?? <em>Sem resumo no registro importado.</em>}
       </div>
 
+      {criteriosDeInclusao.length > 0 && (
+        <div className="alvo">
+          <p className="alvo-titulo">Para incluir, o estudo precisa atender a todos:</p>
+          <ul className="lista-limpa">
+            {criteriosDeInclusao.map((criterioDeInclusao) => (
+              <li key={criterioDeInclusao.id}>
+                <strong>{criterioDeInclusao.codigo}</strong> — {criterioDeInclusao.descricao}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="linha-acoes">
         <button
           type="button"
@@ -605,6 +623,9 @@ function ArtigoEmTriagem({
         </button>
       </div>
 
+      <p className="alvo-titulo" style={{ marginTop: "1.25rem" }}>
+        Ou excluir por um destes motivos:
+      </p>
       <div className="criterios">
         {criterios.map((criterioDeExclusao, posicao) => (
           <button

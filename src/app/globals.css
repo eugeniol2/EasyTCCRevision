@@ -517,6 +517,25 @@ textarea {
   white-space: pre-wrap;
 }
 
+.alvo {
+  border-left: 3px solid var(--incluir);
+  background: var(--incluir-fundo);
+  border-radius: 0 var(--raio) var(--raio) 0;
+  padding: 0.75rem 1rem;
+  margin-top: 1.25rem;
+}
+
+.alvo .lista-limpa {
+  gap: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.alvo-titulo {
+  margin: 0 0 0.4rem;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+}
+
 .criterios {
   display: grid;
   gap: 0.4rem;

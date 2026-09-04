@@ -32,7 +32,7 @@ export interface EstudoParaTriagem {
   bases: string[];
 }
 
-export interface CriterioDeExclusao {
+export interface CriterioDoProtocolo {
   id: string;
   codigo: string;
   descricao: string;
@@ -46,7 +46,10 @@ export function listarProtocolos() {
   return db.select().from(protocolo).orderBy(protocolo.criadoEm).all();
 }
 
-export function listarCriteriosDeExclusao(protocoloId: string): CriterioDeExclusao[] {
+function listarCriteriosDoTipo(
+  protocoloId: string,
+  tipo: "inclusao" | "exclusao",
+): CriterioDoProtocolo[] {
   return db
     .select({
       id: criterio.id,
@@ -54,9 +57,17 @@ export function listarCriteriosDeExclusao(protocoloId: string): CriterioDeExclus
       descricao: criterio.descricao,
     })
     .from(criterio)
-    .where(and(eq(criterio.protocoloId, protocoloId), eq(criterio.tipo, "exclusao")))
+    .where(and(eq(criterio.protocoloId, protocoloId), eq(criterio.tipo, tipo)))
     .orderBy(criterio.ordem)
     .all();
+}
+
+export function listarCriteriosDeExclusao(protocoloId: string): CriterioDoProtocolo[] {
+  return listarCriteriosDoTipo(protocoloId, "exclusao");
+}
+
+export function listarCriteriosDeInclusao(protocoloId: string): CriterioDoProtocolo[] {
+  return listarCriteriosDoTipo(protocoloId, "inclusao");
 }
 
 function agruparBasesPorEstudo(protocoloId: string): Map<string, string[]> {

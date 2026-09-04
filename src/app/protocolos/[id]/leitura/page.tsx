@@ -4,6 +4,7 @@ import {
   contarPorDecisao,
   LEITURA_COMPLETA,
   listarCriteriosDeExclusao,
+  listarCriteriosDeInclusao,
   listarEstudosParaEstagio,
   ROTULO_DO_ESTAGIO,
   TRIAGEM_INICIAL,
@@ -55,6 +56,7 @@ export default async function PaginaDeLeitura({
           estagio={LEITURA_COMPLETA}
           estudos={estudos}
           criterios={listarCriteriosDeExclusao(id)}
+          criteriosDeInclusao={listarCriteriosDeInclusao(id)}
         />
       )}
     </>
