@@ -8,6 +8,7 @@ import {
   LEITURA_COMPLETA,
   TRIAGEM_INICIAL,
 } from "@/lib/consultas";
+import { medirProgresso } from "@/lib/extracao";
 import AcoesDoProtocolo from "./AcoesDoProtocolo";
 
 function formatarData(segundosUnix: number): string {
@@ -25,6 +26,7 @@ export default async function PaginaDoProtocolo({
 
   const naTriagem = contarPorDecisao(id, TRIAGEM_INICIAL);
   const naLeitura = contarPorDecisao(id, LEITURA_COMPLETA);
+  const naExtracao = medirProgresso(id);
   const buscas = db.select().from(busca).where(eq(busca.protocoloId, id)).all();
 
   return (
@@ -109,6 +111,32 @@ export default async function PaginaDoProtocolo({
             href={`/protocolos/${id}/leitura`}
           >
             Ler textos completos
+          </a>
+        </div>
+      </section>
+
+      <section className="cartao" style={{ marginTop: "1.25rem" }}>
+        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Fase 3 — Extração</h2>
+        <p className="subtitulo" style={{ marginBottom: "0.5rem" }}>
+          Os dados de cada estudo incluído na fase 2.
+        </p>
+        <div className="contadores">
+          <span>
+            Estudos <strong>{naExtracao.estudos}</strong>
+          </span>
+          <span>
+            Completos <strong>{naExtracao.completos}</strong>
+          </span>
+          <span>
+            Colunas <strong>{naExtracao.campos}</strong>
+          </span>
+        </div>
+        <div className="linha-acoes">
+          <a
+            className={`botao${naExtracao.estudos > 0 ? " botao-primario" : ""}`}
+            href={`/protocolos/${id}/extracao`}
+          >
+            Preencher extração
           </a>
         </div>
       </section>

@@ -517,6 +517,13 @@ textarea {
   white-space: pre-wrap;
 }
 
+.campo-extraido {
+  min-height: 0;
+  font-family: var(--fonte);
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
 .alvo {
   border-left: 3px solid var(--incluir);
   background: var(--incluir-fundo);

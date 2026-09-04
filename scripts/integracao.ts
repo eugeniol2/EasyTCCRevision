@@ -76,6 +76,15 @@ const { descartarEstudo, descartarTudoDoProtocolo } =
   await import("../src/lib/estudos");
 const { atualizarProtocolo, listarCriteriosEditaveis, salvarCriterios } =
   await import("../src/lib/protocolo");
+const {
+  adicionarCampo,
+  criarCamposPadrao,
+  listarCampos,
+  listarEstudosParaExtracao,
+  medirProgresso,
+  removerCampo,
+  salvarValorExtraido,
+} = await import("../src/lib/extracao");
 const { busca, estudo, triagem } = await import("../src/db/schema");
 
 const ARTIGOS_DA_SCOPUS = String.raw`
@@ -488,6 +497,79 @@ checar(
   "todo criterio de exclusao usa prefixo EC",
   deExclusao.every((c) => c.codigo.startsWith("EC")),
   true,
+);
+
+console.log("");
+console.log("Extracao");
+const antesDaExtracao = listarEstudosParaExtracao(protocoloId);
+checar("nada extrai sem inclusao na fase 2", antesDaExtracao.length, 0);
+
+const naFase2 = listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA);
+salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: naFase2[0]!.id, decisao: "incluido", criterioId: null });
+
+const paraExtrair = listarEstudosParaExtracao(protocoloId);
+checar("so o incluido na fase 2 entra", paraExtrair.length, 1);
+checar("autor ja vem preenchido", paraExtrair[0]!.autores.length > 0, true);
+checar("ano ja vem preenchido", typeof paraExtrair[0]!.ano, "number");
+
+checar("cria as tres colunas padrao", criarCamposPadrao(protocoloId), 3);
+checar("nao recria se ja existem", criarCamposPadrao(protocoloId), 0);
+
+const camposCriados = listarCampos(protocoloId);
+checar("nomes das colunas", camposCriados.map((c) => c.nome), ["Objetivo", "Metodologia", "Resultados"]);
+
+const alvoDaExtracao = paraExtrair[0]!;
+salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Detectar anomalias");
+checar(
+  "valor gravado aparece na leitura",
+  listarEstudosParaExtracao(protocoloId)[0]!.valores[camposCriados[0]!.id],
+  "Detectar anomalias",
+);
+checar("progresso conta preenchidos", listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos, 1);
+
+salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Objetivo revisado");
+checar(
+  "regravar substitui, nao duplica",
+  listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
+  1,
+);
+checar(
+  "valor atualizado",
+  listarEstudosParaExtracao(protocoloId)[0]!.valores[camposCriados[0]!.id],
+  "Objetivo revisado",
+);
+
+salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "   ");
+checar(
+  "valor em branco apaga a celula",
+  listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
+  0,
+);
+
+for (const campo of camposCriados) {
+  salvarValorExtraido(alvoDaExtracao.id, campo.id, `conteudo de ${campo.nome}`);
+}
+const progresso = medirProgresso(protocoloId);
+checar("estudo completo e contado", progresso.completos, 1);
+checar("total de colunas no progresso", progresso.campos, 3);
+
+const novaColuna = adicionarCampo(protocoloId, "Risco de vies", "opcoes", ["alto", "baixo"]);
+checar("coluna adicionada", listarCampos(protocoloId).length, 4);
+checar(
+  "estudo deixa de estar completo com coluna nova",
+  medirProgresso(protocoloId).completos,
+  0,
+);
+
+salvarValorExtraido(alvoDaExtracao.id, novaColuna, "baixo");
+checar("completo de novo apos preencher", medirProgresso(protocoloId).completos, 1);
+
+checar("remover coluna", removerCampo(novaColuna), 1);
+checar("colunas restantes", listarCampos(protocoloId).length, 3);
+checar(
+  "valores da coluna removida somem junto",
+  listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
+  3,
 );
 
 console.log(
