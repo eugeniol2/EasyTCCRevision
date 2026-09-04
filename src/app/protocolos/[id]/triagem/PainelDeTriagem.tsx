@@ -196,6 +196,10 @@ export default function PainelDeTriagem({
     setIndiceAtual((indice) => Math.min(indice, Math.max(0, estudos.length - 1)));
   }, [estudos.length]);
 
+  useEffect(() => {
+    if (decisoes.size === 0) setIndiceAtual(0);
+  }, [decisoes.size]);
+
   const confirmarDescarte = useCallback(() => {
     const estudoId = descartePendente;
     if (estudoId === null) return;
@@ -203,6 +207,17 @@ export default function PainelDeTriagem({
     void descartarArtigo(protocoloId, estudoId);
     setDescartePendente(null);
   }, [descartePendente, protocoloId]);
+
+  const irParaPendente = useCallback(() => {
+    const aFrente = estudos.findIndex(
+      (estudo, indice) => indice > indiceAtual && !decisoes.has(estudo.id),
+    );
+    const escolhido =
+      aFrente === -1
+        ? estudos.findIndex((estudo) => !decisoes.has(estudo.id))
+        : aFrente;
+    if (escolhido !== -1) setIndiceAtual(escolhido);
+  }, [estudos, indiceAtual, decisoes]);
 
   const irPara = useCallback(
     (estudoId: string) => {
@@ -342,7 +357,7 @@ export default function PainelDeTriagem({
                             title="Voltar para pendente"
                             onClick={() => pedirRemocao(estudo.id)}
                           >
-                            ×
+                            ↺
                           </button>
                         )}
                       </td>
@@ -368,9 +383,17 @@ export default function PainelDeTriagem({
         >
           ← Anterior
         </button>
-        <span className="posicao">
-          Estudo <strong>{indiceAtual + 1}</strong> de <strong>{estudos.length}</strong>
-        </span>
+        <div className="posicao">
+          <span>
+            Estudo <strong>{indiceAtual + 1}</strong> de{" "}
+            <strong>{estudos.length}</strong>
+          </span>
+          {contagem.pendente > 0 && (
+            <button type="button" className="link-pendente" onClick={irParaPendente}>
+              ir para o próximo pendente
+            </button>
+          )}
+        </div>
         <button
           type="button"
           className="botao"

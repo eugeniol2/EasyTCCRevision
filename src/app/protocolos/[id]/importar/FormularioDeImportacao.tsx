@@ -2,7 +2,9 @@
 
 import {
   useActionState,
+  useCallback,
   useDeferredValue,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -53,6 +55,27 @@ export default function FormularioDeImportacao({
   const [nomeDoArquivo, setNomeDoArquivo] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState(false);
   const campoDeArquivo = useRef<HTMLInputElement>(null);
+  const campoDaString = useRef<HTMLTextAreaElement>(null);
+  const formulario = useRef<HTMLFormElement>(null);
+
+  const ajustarAltura = useCallback((campo: HTMLTextAreaElement | null) => {
+    if (!campo) return;
+    campo.style.height = "auto";
+    campo.style.height = `${campo.scrollHeight}px`;
+  }, []);
+
+  useEffect(() => {
+    ajustarAltura(campoDaString.current);
+  }, [ajustarAltura]);
+
+  useEffect(() => {
+    if (resultado.estado !== "sucesso") return;
+
+    setConteudo("");
+    setNomeDoArquivo(null);
+    formulario.current?.reset();
+    ajustarAltura(campoDaString.current);
+  }, [resultado, ajustarAltura]);
 
   const conteudoAdiado = useDeferredValue(conteudo);
   const analise = useMemo(() => {
@@ -75,7 +98,7 @@ export default function FormularioDeImportacao({
 
   return (
     <>
-      <form action={enviar} className="cartao grade">
+      <form ref={formulario} action={enviar} className="cartao grade">
         <input type="hidden" name="protocoloId" value={protocoloId} />
 
         <div>
@@ -90,11 +113,15 @@ export default function FormularioDeImportacao({
 
         <div>
           <label htmlFor="stringBusca">String de busca usada nesta base</label>
-          <input
+          <textarea
+            ref={campoDaString}
             id="stringBusca"
             name="stringBusca"
+            className="campo-expansivel"
+            rows={1}
             required
             placeholder='TITLE-ABS-KEY("systematic review" AND "code review")'
+            onInput={(evento) => ajustarAltura(evento.currentTarget)}
           />
         </div>
 
