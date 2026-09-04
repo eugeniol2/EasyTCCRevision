@@ -2,16 +2,18 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { estudo, triagem } from "@/db/schema";
-import { ESTAGIO_DE_TRIAGEM, type Decisao } from "@/lib/consultas";
+import { TRIAGEM_INICIAL, type Decisao, type EstagioDeTriagem } from "@/lib/consultas";
 
 export interface DecisaoDeTriagem {
   estudoId: string;
+  estagio: EstagioDeTriagem;
   decisao: Decisao;
   criterioId: string | null;
 }
 
 export function salvarDecisao({
   estudoId,
+  estagio,
   decisao,
   criterioId,
 }: DecisaoDeTriagem): void {
@@ -21,7 +23,7 @@ export function salvarDecisao({
     .values({
       id: randomUUID(),
       estudoId,
-      estagio: ESTAGIO_DE_TRIAGEM,
+      estagio,
       decisao,
       criterioId: criterioAplicavel,
     })
@@ -36,14 +38,12 @@ export function salvarDecisao({
     .run();
 }
 
-export function removerDecisao(estudoId: string): void {
+export function removerDecisao(
+  estudoId: string,
+  estagio: EstagioDeTriagem,
+): void {
   db.delete(triagem)
-    .where(
-      and(
-        eq(triagem.estudoId, estudoId),
-        eq(triagem.estagio, ESTAGIO_DE_TRIAGEM),
-      ),
-    )
+    .where(and(eq(triagem.estudoId, estudoId), eq(triagem.estagio, estagio)))
     .run();
 }
 

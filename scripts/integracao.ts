@@ -61,8 +61,13 @@ criarEsquema();
 // teste rodaria contra o banco de desenvolvimento sem avisar.
 const { db, fecharBanco } = await import("../src/db/client");
 const { criterio, estudoBusca, protocolo } = await import("../src/db/schema");
-const { contarPorDecisao, listarCriteriosDeExclusao, listarEstudosParaTriagem } =
-  await import("../src/lib/consultas");
+const {
+  contarPorDecisao,
+  LEITURA_COMPLETA,
+  listarCriteriosDeExclusao,
+  listarEstudosParaEstagio,
+  TRIAGEM_INICIAL,
+} = await import("../src/lib/consultas");
 const { importarParaOProtocolo } = await import("../src/lib/importacao");
 const { removerDecisao, removerTodasAsDecisoes, salvarDecisao } =
   await import("../src/lib/triagem");
@@ -154,7 +159,7 @@ const daIeee = importarParaOProtocolo({
 checar("só o inédito entra", daIeee.importados, 1);
 checar("repetido é reconhecido pelo DOI", daIeee.jaExistiamNoProtocolo, 1);
 
-const todosOsEstudos = listarEstudosParaTriagem(protocoloId);
+const todosOsEstudos = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 checar("total sem duplicata", todosOsEstudos.length, 4);
 
 const vinculos = db.select().from(estudoBusca).all();
@@ -192,22 +197,25 @@ const criterios = listarCriteriosDeExclusao(protocoloId);
 checar("critérios de exclusão listados", criterios.length, 2);
 
 salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[0]!.id,
   decisao: "incluido",
   criterioId: null,
 });
 salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[1]!.id,
   decisao: "excluido",
   criterioId: criterios[0]!.id,
 });
 salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[2]!.id,
   decisao: "duvida",
   criterioId: null,
 });
 
-const contagem = contarPorDecisao(protocoloId);
+const contagem = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("incluídos", contagem.incluido, 1);
 checar("excluídos", contagem.excluido, 1);
 checar("em dúvida", contagem.duvida, 1);
@@ -215,31 +223,32 @@ checar("pendentes", contagem.pendente, 1);
 checar("total", contagem.total, 4);
 
 salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[0]!.id,
   decisao: "excluido",
   criterioId: criterios[1]!.id,
 });
-const aposMudarDeIdeia = contarPorDecisao(protocoloId);
+const aposMudarDeIdeia = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("decisão substituída, não duplicada", aposMudarDeIdeia.total, 4);
 checar("passou a contar como excluído", aposMudarDeIdeia.excluido, 2);
 checar("não é mais incluído", aposMudarDeIdeia.incluido, 0);
 
-removerDecisao(todosOsEstudos[0]!.id);
-const aposDesfazer = contarPorDecisao(protocoloId);
+removerDecisao(todosOsEstudos[0]!.id, TRIAGEM_INICIAL);
+const aposDesfazer = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("desfazer devolve para pendente", aposDesfazer.pendente, 2);
 
 console.log("\nLista de incluídos");
-salvarDecisao({ estudoId: todosOsEstudos[0]!.id, decisao: "incluido", criterioId: null });
-salvarDecisao({ estudoId: todosOsEstudos[3]!.id, decisao: "incluido", criterioId: null });
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[0]!.id, decisao: "incluido", criterioId: null });
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[3]!.id, decisao: "incluido", criterioId: null });
 
-const comDecisoes = listarEstudosParaTriagem(protocoloId);
+const comDecisoes = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 const listaDeIncluidos = comDecisoes.filter((e) => e.decisao === "incluido");
 checar("dois incluídos na lista", listaDeIncluidos.length, 2);
 checar(
   "retirar da lista devolve para pendente",
   (() => {
-    removerDecisao(todosOsEstudos[3]!.id);
-    return listarEstudosParaTriagem(protocoloId).filter(
+    removerDecisao(todosOsEstudos[3]!.id, TRIAGEM_INICIAL);
+    return listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).filter(
       (e) => e.decisao === "incluido",
     ).length;
   })(),
@@ -247,8 +256,8 @@ checar(
 );
 
 console.log("\nZerar triagem");
-salvarDecisao({ estudoId: todosOsEstudos[1]!.id, decisao: "duvida", criterioId: null });
-const antesDeZerar = contarPorDecisao(protocoloId);
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[1]!.id, decisao: "duvida", criterioId: null });
+const antesDeZerar = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("ha decisoes antes de zerar", antesDeZerar.total - antesDeZerar.pendente, 3);
 
 const outroProtocoloId = randomUUID();
@@ -262,26 +271,26 @@ importarParaOProtocolo({
   executadaEmSegundos: Math.floor(Date.now() / 1000),
   conteudo: ARTIGOS_DA_SCOPUS,
 });
-const doOutroProtocolo = listarEstudosParaTriagem(outroProtocoloId);
-salvarDecisao({ estudoId: doOutroProtocolo[0]!.id, decisao: "incluido", criterioId: null });
+const doOutroProtocolo = listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL);
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: doOutroProtocolo[0]!.id, decisao: "incluido", criterioId: null });
 
 checar("apaga todas as decisoes do protocolo", removerTodasAsDecisoes(protocoloId), 3);
 
-const aposZerar = contarPorDecisao(protocoloId);
+const aposZerar = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("tudo volta a pendente", aposZerar.pendente, aposZerar.total);
-checar("estudos permanecem", listarEstudosParaTriagem(protocoloId).length, 4);
-checar("protocolo vizinho nao e afetado", contarPorDecisao(outroProtocoloId).incluido, 1);
+checar("estudos permanecem", listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).length, 4);
+checar("protocolo vizinho nao e afetado", contarPorDecisao(outroProtocoloId, TRIAGEM_INICIAL).incluido, 1);
 checar("zerar de novo nao apaga nada", removerTodasAsDecisoes(protocoloId), 0);
 
 console.log("\nDescartar artigo");
-salvarDecisao({ estudoId: doOutroProtocolo[1]!.id, decisao: "duvida", criterioId: null });
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: doOutroProtocolo[1]!.id, decisao: "duvida", criterioId: null });
 const alvo = doOutroProtocolo[1]!;
 const vinculosAntes = db.select().from(estudoBusca).all().length;
 
 checar("descarta um estudo", descartarEstudo(alvo.id), 1);
 checar(
   "estudo some da lista",
-  listarEstudosParaTriagem(outroProtocoloId).some((e) => e.id === alvo.id),
+  listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL).some((e) => e.id === alvo.id),
   false,
 );
 checar(
@@ -298,14 +307,14 @@ checar("descartar de novo nao apaga nada", descartarEstudo(alvo.id), 0);
 checar("busca permanece", db.select().from(busca).all().length > 0, true);
 
 console.log("\nDescartar tudo do protocolo");
-const estudosDoOutro = listarEstudosParaTriagem(outroProtocoloId).length;
+const estudosDoOutro = listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL).length;
 const buscasDoOutro = db.select().from(busca).all()
   .filter((b) => b.protocoloId === outroProtocoloId).length;
 
 const descarte = descartarTudoDoProtocolo(outroProtocoloId);
 checar("remove os estudos", descarte.estudosRemovidos, estudosDoOutro);
 checar("remove as buscas", descarte.buscasRemovidas, buscasDoOutro);
-checar("protocolo fica vazio", contarPorDecisao(outroProtocoloId).total, 0);
+checar("protocolo fica vazio", contarPorDecisao(outroProtocoloId, TRIAGEM_INICIAL).total, 0);
 checar(
   "criterios do protocolo permanecem",
   listarCriteriosDeExclusao(protocoloId).length,
@@ -313,7 +322,7 @@ checar(
 );
 checar(
   "protocolo vizinho mantem seus estudos",
-  listarEstudosParaTriagem(protocoloId).length,
+  listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).length,
   4,
 );
 checar(
@@ -324,7 +333,7 @@ checar(
 
 console.log("");
 console.log("Origem dos estudos");
-const comOrigem = listarEstudosParaTriagem(protocoloId);
+const comOrigem = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 const repetidoNasDuas = comOrigem.find((e) => e.doi === "10.1109/tse.2023.1234567")!;
 checar("artigo repetido mostra as duas bases", repetidoNasDuas.bases.length, 2);
 checar(
@@ -358,8 +367,9 @@ checar("recorte gravado", [protocoloSalvo.anoInicio, protocoloSalvo.anoFim], [20
 const criteriosOriginais = listarCriteriosEditaveis(protocoloId);
 checar("dois criterios existentes", criteriosOriginais.length, 2);
 
-const estudosVivos = listarEstudosParaTriagem(protocoloId);
+const estudosVivos = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
   estudoId: estudosVivos[0]!.id,
   decisao: "excluido",
   criterioId: criteriosOriginais[0]!.id,
@@ -410,6 +420,54 @@ checar(
     { id: null, tipo: "exclusao" as const, descricao: "   " },
   ]).criados,
   0,
+);
+
+console.log("");
+console.log("Funil entre as fases");
+const paraOFunil = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+removerTodasAsDecisoes(protocoloId);
+
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[0]!.id, decisao: "incluido", criterioId: null });
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[1]!.id, decisao: "incluido", criterioId: null });
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[2]!.id, decisao: "excluido", criterioId: null });
+salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[3]!.id, decisao: "duvida", criterioId: null });
+
+const naLeitura = listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA);
+checar("so os incluidos passam para a fase 2", naLeitura.length, 2);
+checar(
+  "excluido na fase 1 nao aparece",
+  naLeitura.some((e) => e.id === paraOFunil[2]!.id),
+  false,
+);
+checar(
+  "em duvida tambem nao passa",
+  naLeitura.some((e) => e.id === paraOFunil[3]!.id),
+  false,
+);
+checar("nenhum estudo duplicado", new Set(naLeitura.map((e) => e.id)).size, 2);
+
+const contagemDaLeitura = contarPorDecisao(protocoloId, LEITURA_COMPLETA);
+checar("contagem da fase 2 respeita o funil", contagemDaLeitura.total, 2);
+checar("todos pendentes na fase 2", contagemDaLeitura.pendente, 2);
+
+salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: naLeitura[0]!.id, decisao: "excluido", criterioId: null });
+checar("decisao da fase 2 conta na fase 2", contarPorDecisao(protocoloId, LEITURA_COMPLETA).excluido, 1);
+checar(
+  "decisao da fase 2 nao altera a fase 1",
+  contarPorDecisao(protocoloId, TRIAGEM_INICIAL).incluido,
+  2,
+);
+checar(
+  "fase 1 nao duplica com decisao nos dois estagios",
+  listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).length,
+  4,
+);
+
+removerDecisao(paraOFunil[0]!.id, TRIAGEM_INICIAL);
+checar(
+  "tirar da fase 1 remove da fase 2",
+  listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA).length,
+  1,
 );
 
 console.log(

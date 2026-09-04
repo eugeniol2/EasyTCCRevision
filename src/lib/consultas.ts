@@ -1,8 +1,17 @@
 import { and, eq, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "@/db/client";
 import { busca, criterio, estudo, estudoBusca, protocolo, triagem } from "@/db/schema";
 
-export const ESTAGIO_DE_TRIAGEM = "titulo_resumo" as const;
+export type EstagioDeTriagem = "titulo_resumo" | "texto_completo";
+
+export const TRIAGEM_INICIAL: EstagioDeTriagem = "titulo_resumo";
+export const LEITURA_COMPLETA: EstagioDeTriagem = "texto_completo";
+
+export const ROTULO_DO_ESTAGIO: Record<EstagioDeTriagem, string> = {
+  titulo_resumo: "Triagem por título e resumo",
+  texto_completo: "Leitura do texto completo",
+};
 
 export type Decisao = "incluido" | "excluido" | "pendente" | "duvida";
 
@@ -70,7 +79,30 @@ function agruparBasesPorEstudo(protocoloId: string): Map<string, string[]> {
   return porEstudo;
 }
 
-export function listarEstudosParaTriagem(protocoloId: string): EstudoParaTriagem[] {
+const decisaoDaEtapaAnterior = alias(triagem, "etapa_anterior");
+
+/**
+ * A leitura de texto completo enxerga apenas o que foi incluído na triagem
+ * inicial. Sem esse filtro, o segundo estágio reapresentaria os estudos já
+ * descartados e o denominador do PRISMA sairia inflado.
+ */
+function somenteDoEstagio(protocoloId: string, estagio: EstagioDeTriagem) {
+  const doProtocolo = eq(estudo.protocoloId, protocoloId);
+
+  return estagio === TRIAGEM_INICIAL
+    ? doProtocolo
+    : and(doProtocolo, eq(decisaoDaEtapaAnterior.decisao, "incluido"));
+}
+
+const juncaoComEtapaAnterior = and(
+  eq(decisaoDaEtapaAnterior.estudoId, estudo.id),
+  eq(decisaoDaEtapaAnterior.estagio, TRIAGEM_INICIAL),
+);
+
+export function listarEstudosParaEstagio(
+  protocoloId: string,
+  estagio: EstagioDeTriagem,
+): EstudoParaTriagem[] {
   const basesPorEstudo = agruparBasesPorEstudo(protocoloId);
 
   const linhas = db
@@ -92,12 +124,10 @@ export function listarEstudosParaTriagem(protocoloId: string): EstudoParaTriagem
     .from(estudo)
     .leftJoin(
       triagem,
-      and(
-        eq(triagem.estudoId, estudo.id),
-        eq(triagem.estagio, ESTAGIO_DE_TRIAGEM),
-      ),
+      and(eq(triagem.estudoId, estudo.id), eq(triagem.estagio, estagio)),
     )
-    .where(eq(estudo.protocoloId, protocoloId))
+    .leftJoin(decisaoDaEtapaAnterior, juncaoComEtapaAnterior)
+    .where(somenteDoEstagio(protocoloId, estagio))
     .orderBy(estudo.criadoEm)
     .all();
 
@@ -115,21 +145,22 @@ export interface ContagemPorDecisao {
   total: number;
 }
 
-export function contarPorDecisao(protocoloId: string): ContagemPorDecisao {
+export function contarPorDecisao(
+  protocoloId: string,
+  estagio: EstagioDeTriagem,
+): ContagemPorDecisao {
   const linhas = db
     .select({
       decisao: triagem.decisao,
-      quantidade: sql<number>`count(*)`,
+      quantidade: sql<number>`count(distinct ${estudo.id})`,
     })
     .from(estudo)
     .leftJoin(
       triagem,
-      and(
-        eq(triagem.estudoId, estudo.id),
-        eq(triagem.estagio, ESTAGIO_DE_TRIAGEM),
-      ),
+      and(eq(triagem.estudoId, estudo.id), eq(triagem.estagio, estagio)),
     )
-    .where(eq(estudo.protocoloId, protocoloId))
+    .leftJoin(decisaoDaEtapaAnterior, juncaoComEtapaAnterior)
+    .where(somenteDoEstagio(protocoloId, estagio))
     .groupBy(triagem.decisao)
     .all();
 

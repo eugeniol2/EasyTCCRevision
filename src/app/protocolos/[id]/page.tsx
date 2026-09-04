@@ -2,7 +2,12 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { busca } from "@/db/schema";
-import { buscarProtocolo, contarPorDecisao } from "@/lib/consultas";
+import {
+  buscarProtocolo,
+  contarPorDecisao,
+  LEITURA_COMPLETA,
+  TRIAGEM_INICIAL,
+} from "@/lib/consultas";
 import AcoesDoProtocolo from "./AcoesDoProtocolo";
 
 function formatarData(segundosUnix: number): string {
@@ -18,7 +23,8 @@ export default async function PaginaDoProtocolo({
   const protocolo = buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const contagem = contarPorDecisao(id);
+  const naTriagem = contarPorDecisao(id, TRIAGEM_INICIAL);
+  const naLeitura = contarPorDecisao(id, LEITURA_COMPLETA);
   const buscas = db.select().from(busca).where(eq(busca.protocoloId, id)).all();
 
   return (
@@ -41,22 +47,22 @@ export default async function PaginaDoProtocolo({
       </header>
 
       <section className="cartao">
-        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Triagem</h2>
+        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Fase 1 — Título e resumo</h2>
         <div className="contadores">
           <span>
-            Total <strong>{contagem.total}</strong>
+            Total <strong>{naTriagem.total}</strong>
           </span>
           <span>
-            Incluídos <strong>{contagem.incluido}</strong>
+            Incluídos <strong>{naTriagem.incluido}</strong>
           </span>
           <span>
-            Excluídos <strong>{contagem.excluido}</strong>
+            Excluídos <strong>{naTriagem.excluido}</strong>
           </span>
           <span>
-            Em dúvida <strong>{contagem.duvida}</strong>
+            Em dúvida <strong>{naTriagem.duvida}</strong>
           </span>
           <span>
-            Pendentes <strong>{contagem.pendente}</strong>
+            Pendentes <strong>{naTriagem.pendente}</strong>
           </span>
         </div>
         <div className="linha-acoes">
@@ -64,14 +70,46 @@ export default async function PaginaDoProtocolo({
             Continuar triagem
           </a>
           <a className="botao" href={`/protocolos/${id}/importar`}>
-            Importar .bib
+            Importar .bib ou .csv
           </a>
           <AcoesDoProtocolo
             protocoloId={id}
-            decisoesTomadas={contagem.total - contagem.pendente}
-            totalDeEstudos={contagem.total}
+            decisoesTomadas={naTriagem.total - naTriagem.pendente}
+            totalDeEstudos={naTriagem.total}
             buscasRegistradas={buscas.length}
           />
+        </div>
+      </section>
+
+      <section className="cartao" style={{ marginTop: "1.25rem" }}>
+        <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Fase 2 — Texto completo</h2>
+        <p className="subtitulo" style={{ marginBottom: "0.5rem" }}>
+          Recebe apenas os incluídos na fase 1.
+        </p>
+        <div className="contadores">
+          <span>
+            Chegaram <strong>{naLeitura.total}</strong>
+          </span>
+          <span>
+            Incluídos <strong>{naLeitura.incluido}</strong>
+          </span>
+          <span>
+            Excluídos <strong>{naLeitura.excluido}</strong>
+          </span>
+          <span>
+            Em dúvida <strong>{naLeitura.duvida}</strong>
+          </span>
+          <span>
+            Pendentes <strong>{naLeitura.pendente}</strong>
+          </span>
+        </div>
+        <div className="linha-acoes">
+          <a
+            className={`botao${naLeitura.total > 0 ? " botao-primario" : ""}`}
+            href={`/protocolos/${id}/leitura`}
+          >
+            Ler textos completos
+          </a>
         </div>
       </section>
 

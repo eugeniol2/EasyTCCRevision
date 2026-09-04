@@ -7,6 +7,7 @@ import { formatarMes } from "@/lib/publicacao";
 import type {
   CriterioDeExclusao,
   Decisao,
+  EstagioDeTriagem,
   EstudoParaTriagem,
 } from "@/lib/consultas";
 import { descartarArtigo, desfazerDecisao, registrarDecisao } from "./acoes";
@@ -48,6 +49,7 @@ interface DecisaoLocal {
 
 interface Props {
   protocoloId: string;
+  estagio: EstagioDeTriagem;
   estudos: EstudoParaTriagem[];
   criterios: CriterioDeExclusao[];
 }
@@ -99,6 +101,7 @@ function primeiroPendente(estudos: EstudoParaTriagem[]): number {
 
 export default function PainelDeTriagem({
   protocoloId,
+  estagio,
   estudos,
   criterios,
 }: Props) {
@@ -192,12 +195,13 @@ export default function PainelDeTriagem({
       void registrarDecisao({
         protocoloId,
         estudoId: estudoAtual.id,
+        estagio,
         decisao,
         criterioId,
       });
       irParaProximoPendente(indiceAtual);
     },
-    [estudoAtual, protocoloId, indiceAtual, irParaProximoPendente],
+    [estudoAtual, protocoloId, estagio, indiceAtual, irParaProximoPendente],
   );
 
   const pedirRemocao = useCallback(
@@ -216,9 +220,9 @@ export default function PainelDeTriagem({
       atualizadas.delete(estudoId);
       return atualizadas;
     });
-    void desfazerDecisao(protocoloId, estudoId);
+    void desfazerDecisao(protocoloId, estudoId, estagio);
     setRemocaoPendente(null);
-  }, [remocaoPendente, protocoloId]);
+  }, [remocaoPendente, protocoloId, estagio]);
 
   const desfazerAtual = useCallback(() => {
     if (estudoAtual) pedirRemocao(estudoAtual.id);
