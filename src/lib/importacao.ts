@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { busca, estudo, estudoBusca } from "@/db/schema";
-import { entradaParaEstudo, type EstudoImportado } from "@/lib/bibtex/paraEstudo";
-import { parseBibtex } from "@/lib/bibtex/parser";
+import type { EstudoImportado } from "@/lib/bibtex/paraEstudo";
 import { deduplicar } from "@/lib/dedup";
+import { lerArquivo } from "@/lib/leitura";
 
 export interface DadosDaImportacao {
   protocoloId: string;
@@ -62,9 +62,9 @@ function listarJaSalvos(protocoloId: string): EstudoJaSalvo[] {
 export function importarParaOProtocolo(
   dados: DadosDaImportacao,
 ): ResumoDaImportacao {
-  const arquivoLido = parseBibtex(dados.conteudo);
+  const arquivoLido = lerArquivo(dados.conteudo);
 
-  if (arquivoLido.entradas.length === 0) {
+  if (arquivoLido.estudos.length === 0) {
     return {
       buscaId: null,
       entradasLidas: 0,
@@ -72,15 +72,11 @@ export function importarParaOProtocolo(
       duplicatasNoArquivo: 0,
       jaExistiamNoProtocolo: 0,
       suspeitas: [],
-      linhasComErro: arquivoLido.erros.map(
-        (erro) => `Linha ${erro.linha}: ${erro.mensagem}`,
-      ),
+      linhasComErro: arquivoLido.erros,
     };
   }
 
-  const { unicos, fundidos, suspeitas } = deduplicar(
-    arquivoLido.entradas.map(entradaParaEstudo),
-  );
+  const { unicos, fundidos, suspeitas } = deduplicar(arquivoLido.estudos);
 
   const jaSalvos = listarJaSalvos(dados.protocoloId);
   const buscaId = randomUUID();
@@ -96,7 +92,7 @@ export function importarParaOProtocolo(
         base: dados.base,
         stringBusca: dados.stringBusca,
         executadaEm: dados.executadaEmSegundos,
-        totalResultados: arquivoLido.entradas.length,
+        totalResultados: arquivoLido.estudos.length,
       })
       .run();
 
@@ -131,7 +127,7 @@ export function importarParaOProtocolo(
 
   return {
     buscaId,
-    entradasLidas: arquivoLido.entradas.length,
+    entradasLidas: arquivoLido.estudos.length,
     importados,
     duplicatasNoArquivo: fundidos.reduce(
       (total, grupo) => total + grupo.duplicatas.length,
@@ -145,8 +141,6 @@ export function importarParaOProtocolo(
         confianca: grupo.confianca,
       })),
     ),
-    linhasComErro: arquivoLido.erros.map(
-      (erro) => `Linha ${erro.linha}: ${erro.mensagem}`,
-    ),
+    linhasComErro: arquivoLido.erros,
   };
 }

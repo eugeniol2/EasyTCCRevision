@@ -387,6 +387,19 @@ textarea {
   margin-left: auto;
 }
 
+.origem {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.45rem;
+  border: 1px solid var(--borda);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  color: var(--texto-suave);
+  background: var(--fundo);
+  white-space: nowrap;
+  vertical-align: baseline;
+}
+
 .area-arquivo {
   display: flex;
   align-items: center;

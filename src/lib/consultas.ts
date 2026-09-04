@@ -1,6 +1,6 @@
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { criterio, estudo, protocolo, triagem } from "@/db/schema";
+import { busca, criterio, estudo, estudoBusca, protocolo, triagem } from "@/db/schema";
 
 export const ESTAGIO_DE_TRIAGEM = "titulo_resumo" as const;
 
@@ -17,6 +17,7 @@ export interface EstudoParaTriagem {
   resumo: string | null;
   decisao: Decisao | null;
   criterioId: string | null;
+  bases: string[];
 }
 
 export interface CriterioDeExclusao {
@@ -46,8 +47,30 @@ export function listarCriteriosDeExclusao(protocoloId: string): CriterioDeExclus
     .all();
 }
 
+function agruparBasesPorEstudo(protocoloId: string): Map<string, string[]> {
+  const origens = db
+    .select({ estudoId: estudoBusca.estudoId, base: busca.base })
+    .from(estudoBusca)
+    .innerJoin(busca, eq(busca.id, estudoBusca.buscaId))
+    .where(eq(busca.protocoloId, protocoloId))
+    .orderBy(busca.executadaEm)
+    .all();
+
+  const porEstudo = new Map<string, string[]>();
+
+  for (const { estudoId, base } of origens) {
+    const jaListadas = porEstudo.get(estudoId);
+    if (!jaListadas) porEstudo.set(estudoId, [base]);
+    else if (!jaListadas.includes(base)) jaListadas.push(base);
+  }
+
+  return porEstudo;
+}
+
 export function listarEstudosParaTriagem(protocoloId: string): EstudoParaTriagem[] {
-  return db
+  const basesPorEstudo = agruparBasesPorEstudo(protocoloId);
+
+  const linhas = db
     .select({
       id: estudo.id,
       titulo: estudo.titulo,
@@ -71,6 +94,11 @@ export function listarEstudosParaTriagem(protocoloId: string): EstudoParaTriagem
     .where(eq(estudo.protocoloId, protocoloId))
     .orderBy(estudo.criadoEm)
     .all();
+
+  return linhas.map((linha) => ({
+    ...linha,
+    bases: basesPorEstudo.get(linha.id) ?? [],
+  }));
 }
 
 export interface ContagemPorDecisao {

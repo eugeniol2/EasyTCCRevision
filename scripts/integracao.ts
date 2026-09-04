@@ -320,6 +320,25 @@ checar(
   true,
 );
 
+console.log("");
+console.log("Origem dos estudos");
+const comOrigem = listarEstudosParaTriagem(protocoloId);
+const repetidoNasDuas = comOrigem.find((e) => e.doi === "10.1109/tse.2023.1234567")!;
+checar("artigo repetido mostra as duas bases", repetidoNasDuas.bases.length, 2);
+checar(
+  "bases sao Scopus e IEEE Xplore",
+  [...repetidoNasDuas.bases].sort(),
+  ["IEEE Xplore", "Scopus"],
+);
+
+const soDaScopus = comOrigem.find((e) => e.doi === "10.1145/3510003.3510123")!;
+checar("artigo de uma base so tem uma origem", soDaScopus.bases, ["Scopus"]);
+checar(
+  "toda origem esta preenchida",
+  comOrigem.every((e) => e.bases.length > 0),
+  true,
+);
+
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,
 );

@@ -60,6 +60,20 @@ function descreverEstudo(estudo: EstudoParaTriagem): string {
   return partes.filter(Boolean).join(" · ");
 }
 
+function Origens({ bases }: { bases: string[] }) {
+  if (bases.length === 0) return null;
+
+  return (
+    <>
+      {bases.map((base) => (
+        <span key={base} className="origem" title="Base em que este estudo foi encontrado">
+          {base}
+        </span>
+      ))}
+    </>
+  );
+}
+
 function primeiroPendente(estudos: EstudoParaTriagem[]): number {
   const indice = estudos.findIndex((estudo) => estudo.decisao === null);
   return indice === -1 ? 0 : indice;
@@ -347,7 +361,10 @@ export default function PainelDeTriagem({
                         >
                           {estudo.titulo}
                         </button>
-                        <div className="subtitulo">{descreverEstudo(estudo)}</div>
+                        <div className="subtitulo">
+                          {descreverEstudo(estudo)}
+                          <Origens bases={estudo.bases} />
+                        </div>
                       </td>
                       <td className="celula-acao">
                         {decisao !== "pendente" && (
@@ -503,6 +520,7 @@ function ArtigoEmTriagem({
             </a>
           </>
         )}
+        <Origens bases={estudo.bases} />
       </p>
 
       <div className="estudo-resumo">

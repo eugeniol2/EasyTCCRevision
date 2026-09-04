@@ -10,7 +10,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
-import { parseBibtex } from "@/lib/bibtex/parser";
+import { lerArquivo } from "@/lib/leitura";
 import { importarBibtex } from "./acoes";
 import { RESULTADO_INICIAL } from "./resultado";
 
@@ -19,13 +19,24 @@ const BASES_SUGERIDAS = [
   "Web of Science",
   "IEEE Xplore",
   "ACM Digital Library",
+  "SpringerLink",
   "ScienceDirect",
+  "Wiley Online Library",
+  "Engineering Village (Compendex)",
+  "Taylor & Francis Online",
+  "Emerald Insight",
+  "arXiv",
+  "DBLP",
+  "Semantic Scholar",
+  "OpenAlex",
+  "PubMed",
   "SciELO",
+  "BDTD",
   "Portal de Periódicos CAPES",
   "Google Scholar",
 ];
 
-const EXTENSOES_ACEITAS = ".bib,.bibtex,.txt";
+const EXTENSOES_ACEITAS = ".bib,.bibtex,.csv,.txt";
 const CARACTERE_DE_SUBSTITUICAO = "�";
 
 function hoje(): string {
@@ -80,8 +91,8 @@ export default function FormularioDeImportacao({
   const conteudoAdiado = useDeferredValue(conteudo);
   const analise = useMemo(() => {
     if (conteudoAdiado.trim() === "") return null;
-    const { entradas, erros } = parseBibtex(conteudoAdiado);
-    return { entradas: entradas.length, erros: erros.length };
+    const { formato, estudos, erros } = lerArquivo(conteudoAdiado);
+    return { formato, entradas: estudos.length, erros: erros.length };
   }, [conteudoAdiado]);
 
   async function carregar(arquivo: File | undefined) {
@@ -137,7 +148,7 @@ export default function FormularioDeImportacao({
         </div>
 
         <div>
-          <label>Arquivo exportado da base</label>
+          <label>Arquivo exportado da base (.bib ou .csv)</label>
           <div
             className={`area-arquivo${arrastando ? " arrastando" : ""}`}
             onDragOver={(evento) => {
@@ -159,7 +170,7 @@ export default function FormularioDeImportacao({
               className="botao"
               onClick={() => campoDeArquivo.current?.click()}
             >
-              Escolher arquivo .bib
+              Escolher arquivo
             </button>
             <span className="subtitulo">
               {nomeDoArquivo ?? "ou arraste o arquivo aqui"}
@@ -182,10 +193,10 @@ export default function FormularioDeImportacao({
           {analise && (
             <p className="subtitulo" style={{ marginTop: "0.4rem" }}>
               {analise.entradas === 0
-                ? "Nenhuma entrada BibTeX reconhecida — confira se o arquivo é .bib e não .ris ou .csv."
-                : `${analise.entradas} entrada(s) reconhecida(s)${
-                    analise.erros > 0 ? `, ${analise.erros} com erro de formato` : ""
-                  }.`}
+                ? "Nenhuma entrada reconhecida — envie o .bib ou o .csv exportado pela base."
+                : `${analise.entradas} entrada(s) reconhecida(s) via ${
+                    analise.formato === "csv" ? "CSV" : "BibTeX"
+                  }${analise.erros > 0 ? `, ${analise.erros} linha(s) com problema` : ""}.`}
             </p>
           )}
         </div>

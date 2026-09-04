@@ -4,6 +4,9 @@ import { latexParaUnicode } from "../src/lib/bibtex/latex";
 import { entradaParaEstudo } from "../src/lib/bibtex/paraEstudo";
 import { parseBibtex } from "../src/lib/bibtex/parser";
 import { normalizarDoi, normalizarTitulo } from "../src/lib/normalizar";
+import { parseCsv } from "../src/lib/csv/parser";
+import { separarAutoresDeCsv } from "../src/lib/csv/paraEstudo";
+import { detectarFormato, lerArquivo } from "../src/lib/leitura";
 
 let verificacoesQuePassaram = 0;
 let verificacoesQueFalharam = 0;
@@ -214,6 +217,74 @@ const artigoDeOutroTema = {
 const dedupSemRelacao = deduplicar([{ ...estudoSemDoi }, artigoDeOutroTema]);
 checar("artigos distintos permanecem separados", dedupSemRelacao.unicos.length, 2);
 checar("nenhuma suspeita falsa", dedupSemRelacao.suspeitas.length, 0);
+
+const QUEBRA_DE_LINHA = String.fromCharCode(10);
+
+secao("CSV");
+const CSV_SPRINGER = [
+  "Item Title,Publication Title,Item DOI,Authors,Publication Year,URL,Content Type",
+  '"Securing IoT: protocols, tools, and metrics",Scientific Reports,10.1038/s41598-025-23865-4,Deepa Ashok PatilShyamala G.,2025,https://link.springer.com/article/10.1038/s41598-025-23865-4,Article',
+  "Privacy-preserving detection of threats,Cluster Computing,10.1007/s10586-026-06472-4,Manish KhuleDeepak MotwaniDipti Chauhan,2026,https://link.springer.com/article/10.1007/s10586-026-06472-4,Article",
+].join(QUEBRA_DE_LINHA);
+
+const linhasDoCsv = parseCsv(CSV_SPRINGER);
+checar("linhas lidas", linhasDoCsv.length, 3);
+checar("colunas do cabeçalho", linhasDoCsv[0]!.length, 7);
+checar(
+  "vírgula dentro de aspas não separa campo",
+  linhasDoCsv[1]![0],
+  "Securing IoT: protocols, tools, and metrics",
+);
+checar('aspas duplicadas viram uma', parseCsv('a,"diz ""oi""",b')[0]![1], 'diz "oi"');
+checar("campo vazio é preservado", parseCsv("a,,c")[0]!.length, 3);
+
+checar("formato csv detectado", detectarFormato(CSV_SPRINGER), "csv");
+checar("formato bibtex detectado", detectarFormato("@article{a, title={x}}"), "bibtex");
+checar("formato desconhecido", detectarFormato("texto solto sem estrutura"), "desconhecido");
+
+secao("Autores colados do CSV da Springer");
+checar(
+  "tres autores sem separador",
+  separarAutoresDeCsv("Manish KhuleDeepak MotwaniDipti Chauhan").length,
+  3,
+);
+checar(
+  "sobrenome do primeiro nao vaza para o segundo",
+  separarAutoresDeCsv("Manish KhuleDeepak Motwani")[0]!.family,
+  "Khule",
+);
+checar(
+  "inicial do meio nao quebra o nome",
+  separarAutoresDeCsv("Abdullah M. BaqasahSultan Algarni").length,
+  2,
+);
+checar(
+  "sete autores concatenados",
+  separarAutoresDeCsv(
+    "Umesh Kumar LilhoreSantosh KumarRoobaea AlroobaeaMajed AlsafyaniAbdullah M. BaqasahSultan AlgarniLidia Gosy Tekeste",
+  ).length,
+  7,
+);
+checar(
+  "separador explicito continua funcionando",
+  separarAutoresDeCsv("Silva, Joao; Souza, Maria").length,
+  2,
+);
+checar("campo vazio nao gera autor", separarAutoresDeCsv("").length, 0);
+
+secao("CSV -> Estudo");
+const doCsv = lerArquivo(CSV_SPRINGER);
+checar("dois estudos", doCsv.estudos.length, 2);
+checar("sem erros", doCsv.erros.length, 0);
+checar("doi normalizado", doCsv.estudos[1]!.doiNorm, "10.1007/s10586-026-06472-4");
+checar("veiculo mapeado", doCsv.estudos[1]!.veiculo, "Cluster Computing");
+checar("ano mapeado", doCsv.estudos[1]!.ano, 2026);
+checar("tipo em minusculas", doCsv.estudos[1]!.tipo, "article");
+checar(
+  "csv sem coluna de titulo vira erro",
+  lerArquivo(["Coluna A,Coluna B", "1,2"].join(QUEBRA_DE_LINHA)).erros.length > 0,
+  true,
+);
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,

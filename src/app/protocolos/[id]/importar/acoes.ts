@@ -26,7 +26,7 @@ export async function importarBibtex(
   if (!base) return resultadoComErro("Informe a base em que a busca foi executada.");
   if (!stringBusca) return resultadoComErro("Informe a string de busca usada.");
   if (!executadaEm) return resultadoComErro("Informe a data em que a busca foi executada.");
-  if (!conteudo) return resultadoComErro("Cole o conteúdo do arquivo .bib.");
+  if (!conteudo) return resultadoComErro("Escolha o arquivo exportado ou cole o conteúdo.");
 
   const resumo = importarParaOProtocolo({
     protocoloId,
@@ -38,7 +38,7 @@ export async function importarBibtex(
 
   if (resumo.entradasLidas === 0) {
     return resultadoComErro(
-      "Nenhuma entrada BibTeX válida foi encontrada no conteúdo colado.",
+      "Nenhuma entrada válida foi encontrada. Envie o .bib ou o .csv exportado pela base.",
     );
   }
 
