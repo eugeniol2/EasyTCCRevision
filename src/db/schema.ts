@@ -79,7 +79,12 @@ export const estudo = sqliteTable(
       .notNull()
       .default(LISTA_VAZIA),
     ano: integer("ano"),
+    mes: integer("mes"),
     veiculo: text("veiculo"),
+    palavrasChave: text("palavras_chave", { mode: "json" })
+      .$type<string[]>()
+      .notNull()
+      .default(LISTA_VAZIA),
     tipo: text("tipo"),
 
     doi: text("doi"),

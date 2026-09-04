@@ -7,6 +7,7 @@ import { normalizarDoi, normalizarTitulo } from "../src/lib/normalizar";
 import { parseCsv } from "../src/lib/csv/parser";
 import { separarAutoresDeCsv } from "../src/lib/csv/paraEstudo";
 import { detectarFormato, lerArquivo } from "../src/lib/leitura";
+import { extrairMes, extrairPalavrasChave, formatarMes } from "../src/lib/publicacao";
 
 let verificacoesQuePassaram = 0;
 let verificacoesQueFalharam = 0;
@@ -285,6 +286,60 @@ checar(
   lerArquivo(["Coluna A,Coluna B", "1,2"].join(QUEBRA_DE_LINHA)).erros.length > 0,
   true,
 );
+
+secao("Mes e temas");
+checar("mes por abreviacao", extrairMes("jan"), 1);
+checar("mes por nome completo", extrairMes("September"), 9);
+checar("mes em portugues", extrairMes("março"), 3);
+checar("mes numerico", extrairMes("11"), 11);
+checar("mes dentro de data ISO", extrairMes("2026-04-15"), 4);
+checar("mes invalido vira nulo", extrairMes("13"), null);
+checar("ano sozinho nao vira mes", extrairMes("2026"), null);
+checar("mes formatado", formatarMes(3), "Março");
+checar("mes nulo nao formata", formatarMes(null), null);
+
+checar(
+  "temas separados por ponto e virgula",
+  extrairPalavrasChave("Accuracy;Machine learning;Cloud security"),
+  ["Accuracy", "Machine learning", "Cloud security"],
+);
+checar(
+  "temas separados por virgula",
+  extrairPalavrasChave("anomaly detection, audit log"),
+  ["anomaly detection", "audit log"],
+);
+checar(
+  "tema repetido some",
+  extrairPalavrasChave("Seguranca;seguranca;Redes").length,
+  2,
+);
+checar("campo vazio nao gera tema", extrairPalavrasChave(""), []);
+
+const comMetadados = lerArquivo(
+  "@article{a, title={T}, year={2026}, month={mar}, keywords={IA;Seguranca}}",
+);
+checar("mes lido do bibtex", comMetadados.estudos[0]!.mes, 3);
+checar("temas lidos do bibtex", comMetadados.estudos[0]!.palavrasChave.length, 2);
+
+secao("Nome invertido na exportacao");
+const CAMPO_INVERTIDO =
+  "A M M I P, Athapaththu and R M C A, Rathnayaka and Yapa, Kanishka and Fernando, Harinda";
+const autoresInvertidos = parseAutores(CAMPO_INVERTIDO);
+
+checar("quantidade preservada", autoresInvertidos.length, 4);
+checar("iniciais antes da virgula viram prenome", autoresInvertidos[0]!.given, "A M M I P");
+checar("sobrenome real e reconhecido", autoresInvertidos[0]!.family, "Athapaththu");
+checar("segundo autor tambem corrigido", autoresInvertidos[1]!.family, "Rathnayaka");
+checar("autor ja correto nao e trocado", autoresInvertidos[2]!.family, "Yapa");
+checar("prenome do autor correto", autoresInvertidos[2]!.given, "Kanishka");
+checar(
+  "exibicao final",
+  formatarAutores(autoresInvertidos, 10),
+  "Athapaththu A.; Rathnayaka R.; Yapa K.; Fernando H.",
+);
+checar("inicial com ponto tambem troca", parseAutores("J. R., Tolkien")[0]!.family, "Tolkien");
+checar("sobrenome normal permanece", parseAutores("Knuth, Donald E.")[0]!.family, "Knuth");
+checar("particula permanece", parseAutores("van der Berg, Jan")[0]!.family, "van der Berg");
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,

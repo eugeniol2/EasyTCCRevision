@@ -446,6 +446,40 @@ textarea {
   margin: 0 0 1rem;
 }
 
+.ficha {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.35rem 1rem;
+  margin: 0 0 1.1rem;
+  font-size: 0.9rem;
+}
+
+.ficha dt {
+  color: var(--texto-suave);
+  font-size: 0.8rem;
+  padding-top: 0.1rem;
+}
+
+.ficha dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.temas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.tema {
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--duvida-fundo);
+  color: var(--texto);
+  font-size: 0.78rem;
+}
+
 .estudo-resumo {
   max-height: 15rem;
   overflow-y: auto;

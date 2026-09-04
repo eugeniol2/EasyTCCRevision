@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DialogoDeConfirmacao from "@/app/componentes/DialogoDeConfirmacao";
 import { formatarAutores } from "@/lib/bibtex/autores";
+import { formatarMes } from "@/lib/publicacao";
 import type {
   CriterioDeExclusao,
   Decisao,
@@ -70,6 +71,23 @@ function Origens({ bases }: { bases: string[] }) {
           {base}
         </span>
       ))}
+    </>
+  );
+}
+
+function Detalhe({
+  rotulo,
+  valor,
+}: {
+  rotulo: string;
+  valor: string | number | null | undefined;
+}) {
+  if (valor === null || valor === undefined || valor === "") return null;
+
+  return (
+    <>
+      <dt>{rotulo}</dt>
+      <dd>{valor}</dd>
     </>
   );
 }
@@ -510,18 +528,46 @@ function ArtigoEmTriagem({
       )}
 
       <h2 className="estudo-titulo">{estudo.titulo}</h2>
-      <p className="estudo-meta">
-        {descreverEstudo(estudo)}
+
+      <dl className="ficha">
+        <Detalhe rotulo="Autores" valor={formatarAutores(estudo.autores, 20)} />
+        <Detalhe rotulo="Ano" valor={estudo.ano} />
+        <Detalhe rotulo="Mês" valor={formatarMes(estudo.mes)} />
+        <Detalhe rotulo="Veículo" valor={estudo.veiculo} />
+        <Detalhe rotulo="Tipo" valor={estudo.tipo} />
+        <Detalhe rotulo="DOI" valor={estudo.doi} />
+
         {estudo.url && (
           <>
-            {" · "}
-            <a href={estudo.url} target="_blank" rel="noopener noreferrer">
-              {estudo.doi ?? "abrir"}
-            </a>
+            <dt>Link</dt>
+            <dd>
+              <a href={estudo.url} target="_blank" rel="noopener noreferrer">
+                {estudo.url}
+              </a>
+            </dd>
           </>
         )}
-        <Origens bases={estudo.bases} />
-      </p>
+
+        {estudo.palavrasChave.length > 0 && (
+          <>
+            <dt>Temas</dt>
+            <dd className="temas">
+              {estudo.palavrasChave.map((tema) => (
+                <span key={tema} className="tema">
+                  {tema}
+                </span>
+              ))}
+            </dd>
+          </>
+        )}
+
+        {estudo.bases.length > 0 && (
+          <>
+            <dt>Origem</dt>
+            <dd>{estudo.bases.join(", ")}</dd>
+          </>
+        )}
+      </dl>
 
       <div className="estudo-resumo">
         {estudo.resumo ?? <em>Sem resumo no registro importado.</em>}

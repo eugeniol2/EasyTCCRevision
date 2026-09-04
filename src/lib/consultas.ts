@@ -11,7 +11,10 @@ export interface EstudoParaTriagem {
   titulo: string;
   autores: { given?: string; family?: string; literal?: string }[];
   ano: number | null;
+  mes: number | null;
   veiculo: string | null;
+  palavrasChave: string[];
+  tipo: string | null;
   url: string | null;
   doi: string | null;
   resumo: string | null;
@@ -76,7 +79,10 @@ export function listarEstudosParaTriagem(protocoloId: string): EstudoParaTriagem
       titulo: estudo.titulo,
       autores: estudo.autores,
       ano: estudo.ano,
+      mes: estudo.mes,
       veiculo: estudo.veiculo,
+      palavrasChave: estudo.palavrasChave,
+      tipo: estudo.tipo,
       url: estudo.url,
       doi: estudo.doi,
       resumo: estudo.resumo,

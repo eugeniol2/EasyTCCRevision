@@ -5,6 +5,7 @@ import {
   normalizarTitulo,
   normalizarUrl,
 } from "@/lib/normalizar";
+import { extrairMes, extrairPalavrasChave } from "@/lib/publicacao";
 import { parseAutores } from "./autores";
 import { latexParaUnicode } from "./latex";
 import type { EntradaBruta } from "./parser";
@@ -14,7 +15,9 @@ export interface EstudoImportado {
   tituloNorm: string;
   autores: Autor[];
   ano: number | null;
+  mes: number | null;
   veiculo: string | null;
+  palavrasChave: string[];
   tipo: string;
   doi: string | null;
   doiNorm: string | null;
@@ -100,7 +103,9 @@ export function entradaParaEstudo(entrada: EntradaBruta): EstudoImportado {
     tituloNorm: normalizarTitulo(titulo),
     autores: parseAutores(campos.author ?? campos.editor),
     ano: extrairAno(campos.year ?? campos.date),
+    mes: extrairMes(campos.month ?? campos.date),
     veiculo: extrairVeiculo(campos, tipo),
+    palavrasChave: extrairPalavrasChave(campos.keywords ?? campos.keyword),
     tipo,
     doi,
     doiNorm: doi,
