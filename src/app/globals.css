@@ -1,0 +1,328 @@
+:root {
+  --fundo: #fbfaf8;
+  --superficie: #ffffff;
+  --borda: #e3dfd8;
+  --texto: #1c1a17;
+  --texto-suave: #6b655c;
+  --destaque: #8a5a2b;
+  --incluir: #2f6d4f;
+  --incluir-fundo: #e8f2ec;
+  --excluir: #99392f;
+  --excluir-fundo: #f8eae8;
+  --duvida: #8a6d1f;
+  --duvida-fundo: #f6efdc;
+  --raio: 10px;
+  --fonte: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fundo: #161513;
+    --superficie: #201e1b;
+    --borda: #34302b;
+    --texto: #ece8e1;
+    --texto-suave: #9d968b;
+    --destaque: #d19a63;
+    --incluir: #7cc39a;
+    --incluir-fundo: #1c2f26;
+    --excluir: #e08b80;
+    --excluir-fundo: #33201e;
+    --duvida: #d9bd6e;
+    --duvida-fundo: #2e2819;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fundo);
+  color: var(--texto);
+  font-family: var(--fonte);
+  line-height: 1.55;
+}
+
+a {
+  color: var(--destaque);
+}
+
+.container {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.cabecalho {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--borda);
+  padding-bottom: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.cabecalho h1 {
+  font-size: 1.35rem;
+  margin: 0;
+}
+
+.subtitulo {
+  color: var(--texto-suave);
+  font-size: 0.875rem;
+  margin: 0.2rem 0 0;
+}
+
+.cartao {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 1.25rem 1.4rem;
+}
+
+.grade {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.linha-acoes {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.botao {
+  display: inline-block;
+  border: 1px solid var(--borda);
+  background: var(--superficie);
+  color: var(--texto);
+  border-radius: var(--raio);
+  padding: 0.5rem 0.95rem;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.botao:hover {
+  border-color: var(--destaque);
+}
+
+.botao-primario {
+  background: var(--destaque);
+  border-color: var(--destaque);
+  color: #fff;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  margin-bottom: 0.3rem;
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  background: var(--fundo);
+  color: var(--texto);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+textarea {
+  min-height: 11rem;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+.area-arquivo {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  border: 1px dashed var(--borda);
+  border-radius: var(--raio);
+  padding: 0.9rem 1rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.area-arquivo.arrastando {
+  border-color: var(--destaque);
+  background: var(--duvida-fundo);
+}
+
+.area-arquivo .subtitulo {
+  margin: 0;
+}
+
+.barra-progresso {
+  height: 5px;
+  background: var(--borda);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 0.75rem 0 1.5rem;
+}
+
+.barra-progresso div {
+  height: 100%;
+  background: var(--destaque);
+  transition: width 0.18s ease;
+}
+
+.estudo-titulo {
+  font-size: 1.3rem;
+  line-height: 1.35;
+  margin: 0 0 0.5rem;
+}
+
+.estudo-meta {
+  color: var(--texto-suave);
+  font-size: 0.875rem;
+  margin: 0 0 1rem;
+}
+
+.estudo-resumo {
+  max-height: 15rem;
+  overflow-y: auto;
+  font-size: 0.925rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--borda);
+  white-space: pre-wrap;
+}
+
+.criterios {
+  display: grid;
+  gap: 0.4rem;
+  margin-top: 1.25rem;
+}
+
+.criterio {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  font-size: 0.875rem;
+  background: none;
+  border: none;
+  color: var(--texto);
+  text-align: left;
+  padding: 0.3rem 0.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.criterio:hover {
+  background: var(--excluir-fundo);
+}
+
+kbd {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.75rem;
+  border: 1px solid var(--borda);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0.1rem 0.4rem;
+  background: var(--fundo);
+  color: var(--texto-suave);
+  white-space: nowrap;
+}
+
+.atalhos {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--texto-suave);
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--borda);
+}
+
+.selo {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.selo-incluido {
+  background: var(--incluir-fundo);
+  color: var(--incluir);
+}
+
+.selo-excluido {
+  background: var(--excluir-fundo);
+  color: var(--excluir);
+}
+
+.selo-duvida {
+  background: var(--duvida-fundo);
+  color: var(--duvida);
+}
+
+.contadores {
+  display: flex;
+  gap: 1.25rem;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  flex-wrap: wrap;
+}
+
+.contadores strong {
+  color: var(--texto);
+  font-variant-numeric: tabular-nums;
+}
+
+.vazio {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--texto-suave);
+}
+
+.aviso {
+  border-left: 3px solid var(--duvida);
+  background: var(--duvida-fundo);
+  padding: 0.75rem 1rem;
+  border-radius: 0 var(--raio) var(--raio) 0;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.lista-limpa {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.tabela {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.tabela th,
+.tabela td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--borda);
+  vertical-align: top;
+}
+
+.tabela th {
+  color: var(--texto-suave);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
