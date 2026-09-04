@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { triagem } from "@/db/schema";
+import { estudo, triagem } from "@/db/schema";
 import { ESTAGIO_DE_TRIAGEM, type Decisao } from "@/lib/consultas";
 
 export interface DecisaoDeTriagem {
@@ -45,4 +45,20 @@ export function removerDecisao(estudoId: string): void {
       ),
     )
     .run();
+}
+
+export function removerTodasAsDecisoes(protocoloId: string): number {
+  const estudosDoProtocolo = db
+    .select({ id: estudo.id })
+    .from(estudo)
+    .where(eq(estudo.protocoloId, protocoloId))
+    .all()
+    .map((linha) => linha.id);
+
+  if (estudosDoProtocolo.length === 0) return 0;
+
+  return db
+    .delete(triagem)
+    .where(inArray(triagem.estudoId, estudosDoProtocolo))
+    .run().changes;
 }

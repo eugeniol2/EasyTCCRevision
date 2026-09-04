@@ -290,6 +290,70 @@ textarea {
   color: var(--texto-suave);
 }
 
+.fundo-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.25rem;
+  z-index: 10;
+}
+
+.modal {
+  background: var(--superficie);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 1.4rem 1.5rem;
+  max-width: 32rem;
+  width: 100%;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
+}
+
+.modal h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.modal-corpo {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--texto-suave);
+}
+
+.modal-estudo {
+  border-left: 3px solid var(--borda);
+  padding-left: 0.85rem;
+  margin-bottom: 1.4rem;
+}
+
+.modal-estudo p {
+  margin: 0.4rem 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.modal-acoes {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.botao-perigo {
+  background: var(--excluir);
+  border-color: var(--excluir);
+  color: #fff;
+}
+
+.botao-perigo kbd {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+}
+
 .area-arquivo {
   display: flex;
   align-items: center;

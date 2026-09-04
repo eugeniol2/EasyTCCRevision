@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import DialogoDeConfirmacao from "@/app/componentes/DialogoDeConfirmacao";
 import { formatarAutores } from "@/lib/bibtex/autores";
 import type {
   CriterioDeExclusao,
@@ -79,6 +80,7 @@ export default function PainelDeTriagem({
   );
   const [indiceAtual, setIndiceAtual] = useState(() => primeiroPendente(estudos));
   const [grupoAberto, setGrupoAberto] = useState<Decisao | null>(null);
+  const [remocaoPendente, setRemocaoPendente] = useState<string | null>(null);
 
   const estudoAtual = estudos[indiceAtual];
 
@@ -139,21 +141,29 @@ export default function PainelDeTriagem({
     [estudoAtual, protocoloId, indiceAtual, irParaProximoPendente],
   );
 
-  const retirarDecisao = useCallback(
+  const pedirRemocao = useCallback(
     (estudoId: string) => {
-      setDecisoes((anteriores) => {
-        const atualizadas = new Map(anteriores);
-        atualizadas.delete(estudoId);
-        return atualizadas;
-      });
-      void desfazerDecisao(protocoloId, estudoId);
+      if (decisoes.has(estudoId)) setRemocaoPendente(estudoId);
     },
-    [protocoloId],
+    [decisoes],
   );
 
+  const confirmarRemocao = useCallback(() => {
+    const estudoId = remocaoPendente;
+    if (estudoId === null) return;
+
+    setDecisoes((anteriores) => {
+      const atualizadas = new Map(anteriores);
+      atualizadas.delete(estudoId);
+      return atualizadas;
+    });
+    void desfazerDecisao(protocoloId, estudoId);
+    setRemocaoPendente(null);
+  }, [remocaoPendente, protocoloId]);
+
   const desfazerAtual = useCallback(() => {
-    if (estudoAtual) retirarDecisao(estudoAtual.id);
-  }, [estudoAtual, retirarDecisao]);
+    if (estudoAtual) pedirRemocao(estudoAtual.id);
+  }, [estudoAtual, pedirRemocao]);
 
   const irPara = useCallback((estudoId: string) => {
     setIndiceAtual(estudos.findIndex((estudo) => estudo.id === estudoId));
@@ -161,6 +171,8 @@ export default function PainelDeTriagem({
 
   useEffect(() => {
     function aoTeclar(evento: KeyboardEvent) {
+      if (remocaoPendente !== null) return;
+
       const alvo = evento.target as HTMLElement | null;
       const estaDigitando = alvo?.tagName === "INPUT" || alvo?.tagName === "TEXTAREA";
       if (estaDigitando || evento.metaKey || evento.ctrlKey || evento.altKey) return;
@@ -203,7 +215,7 @@ export default function PainelDeTriagem({
 
     window.addEventListener("keydown", aoTeclar);
     return () => window.removeEventListener("keydown", aoTeclar);
-  }, [decidir, desfazerAtual, criterios, estudos.length]);
+  }, [decidir, desfazerAtual, criterios, estudos.length, remocaoPendente]);
 
   if (estudos.length === 0) {
     return (
@@ -285,7 +297,7 @@ export default function PainelDeTriagem({
                             type="button"
                             className="botao-retirar"
                             title="Voltar para pendente"
-                            onClick={() => retirarDecisao(estudo.id)}
+                            onClick={() => pedirRemocao(estudo.id)}
                           >
                             ×
                           </button>
@@ -327,6 +339,26 @@ export default function PainelDeTriagem({
           Próximo →
         </button>
       </div>
+
+      {remocaoPendente !== null && (
+        <DialogoDeConfirmacao
+          titulo="Remover esta decisão?"
+          rotuloConfirmar="Remover"
+          onConfirmar={confirmarRemocao}
+          onCancelar={() => setRemocaoPendente(null)}
+        >
+          <p className="modal-corpo">
+            O estudo volta para <strong>pendente</strong> e você precisará
+            decidir de novo.
+          </p>
+          <div className="modal-estudo">
+            <span className={`selo ${CLASSE_DO_SELO[decisaoDe(remocaoPendente)]}`}>
+              {ROTULO_DA_DECISAO[decisaoDe(remocaoPendente)]}
+            </span>
+            <p>{estudos.find((estudo) => estudo.id === remocaoPendente)?.titulo}</p>
+          </div>
+        </DialogoDeConfirmacao>
+      )}
 
       {estudoAtual && (
         <ArtigoEmTriagem

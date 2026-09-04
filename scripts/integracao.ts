@@ -64,7 +64,8 @@ const { criterio, estudoBusca, protocolo } = await import("../src/db/schema");
 const { contarPorDecisao, listarCriteriosDeExclusao, listarEstudosParaTriagem } =
   await import("../src/lib/consultas");
 const { importarParaOProtocolo } = await import("../src/lib/importacao");
-const { removerDecisao, salvarDecisao } = await import("../src/lib/triagem");
+const { removerDecisao, removerTodasAsDecisoes, salvarDecisao } =
+  await import("../src/lib/triagem");
 
 const ARTIGOS_DA_SCOPUS = String.raw`
 @article{silva2023,
@@ -240,7 +241,35 @@ checar(
   1,
 );
 
+console.log("\nZerar triagem");
+salvarDecisao({ estudoId: todosOsEstudos[1]!.id, decisao: "duvida", criterioId: null });
+const antesDeZerar = contarPorDecisao(protocoloId);
+checar("ha decisoes antes de zerar", antesDeZerar.total - antesDeZerar.pendente, 3);
+
+const outroProtocoloId = randomUUID();
+db.insert(protocolo)
+  .values({ id: outroProtocoloId, titulo: "Outro protocolo", anoInicio: 2020, anoFim: 2024 })
+  .run();
+importarParaOProtocolo({
+  protocoloId: outroProtocoloId,
+  base: "ACM",
+  stringBusca: "outra",
+  executadaEmSegundos: Math.floor(Date.now() / 1000),
+  conteudo: ARTIGOS_DA_SCOPUS,
+});
+const doOutroProtocolo = listarEstudosParaTriagem(outroProtocoloId);
+salvarDecisao({ estudoId: doOutroProtocolo[0]!.id, decisao: "incluido", criterioId: null });
+
+checar("apaga todas as decisoes do protocolo", removerTodasAsDecisoes(protocoloId), 3);
+
+const aposZerar = contarPorDecisao(protocoloId);
+checar("tudo volta a pendente", aposZerar.pendente, aposZerar.total);
+checar("estudos permanecem", listarEstudosParaTriagem(protocoloId).length, 4);
+checar("protocolo vizinho nao e afetado", contarPorDecisao(outroProtocoloId).incluido, 1);
+checar("zerar de novo nao apaga nada", removerTodasAsDecisoes(protocoloId), 0);
+
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,
 );
-process.exit(verificacoesQueFalharam > 0 ? 1 : 0);
+fecharBanco();
+process.exitCode = verificacoesQueFalharam > 0 ? 1 : 0;
