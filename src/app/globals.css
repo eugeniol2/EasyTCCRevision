@@ -108,6 +108,12 @@ select:focus-visible {
   margin-top: 1rem;
 }
 
+/* Separa a criação de revisão da lista acima, tanto no botão fechado
+   quanto no formulário aberto. */
+.nova-revisao {
+  margin-top: 1.25rem;
+}
+
 .botao {
   display: inline-block;
   border: 1px solid var(--borda);

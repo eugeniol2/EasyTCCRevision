@@ -23,7 +23,7 @@ export default function NovaRevisao({ comecarAberto }: Props) {
     return (
       <button
         type="button"
-        className="botao botao-primario"
+        className="botao botao-primario nova-revisao"
         onClick={() => setAberto(true)}
       >
         Nova revisão
@@ -32,7 +32,7 @@ export default function NovaRevisao({ comecarAberto }: Props) {
   }
 
   return (
-    <form action={enviar} className="cartao grade">
+    <form action={enviar} className="cartao grade nova-revisao">
       <div>
         <label htmlFor="novoTitulo">Título da revisão</label>
         <input id="novoTitulo" name="titulo" required />
