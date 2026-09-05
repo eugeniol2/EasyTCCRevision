@@ -13,6 +13,7 @@ import {
 import { Girando } from "@/app/componentes/Carregamento";
 import { lerArquivo } from "@/lib/leitura";
 import { importarBibtex } from "./acoes";
+import ComoExportar from "./ComoExportar";
 import { RESULTADO_INICIAL } from "./resultado";
 
 const BASES = ["IEEE Xplore", "SpringerLink", "Google Scholar"];
@@ -43,6 +44,7 @@ export default function FormularioDeImportacao({
     importarBibtex,
     RESULTADO_INICIAL,
   );
+  const [baseEscolhida, setBaseEscolhida] = useState("");
   const [conteudo, setConteudo] = useState("");
   const [nomeDoArquivo, setNomeDoArquivo] = useState<string | null>(null);
   const [arrastando, setArrastando] = useState(false);
@@ -69,6 +71,7 @@ export default function FormularioDeImportacao({
   useEffect(() => {
     if (resultado.estado !== "sucesso") return;
 
+    setBaseEscolhida("");
     setConteudo("");
     setNomeDoArquivo(null);
     formulario.current?.reset();
@@ -103,7 +106,13 @@ export default function FormularioDeImportacao({
 
         <div>
           <label htmlFor="base">Base consultada</label>
-          <select id="base" name="base" required defaultValue="">
+          <select
+            id="base"
+            name="base"
+            required
+            value={baseEscolhida}
+            onChange={(evento) => setBaseEscolhida(evento.target.value)}
+          >
             <option value="" disabled>
               Selecione a base
             </option>
@@ -114,6 +123,8 @@ export default function FormularioDeImportacao({
             ))}
           </select>
         </div>
+
+        <ComoExportar key={baseEscolhida} base={baseEscolhida} />
 
         <div>
           <label htmlFor="stringBusca">String de busca usada nesta base</label>
