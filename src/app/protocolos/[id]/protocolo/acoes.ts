@@ -41,7 +41,7 @@ export async function salvarProtocolo(
     return { estado: "erro", mensagem: "O ano inicial não pode ser maior que o final." };
   }
 
-  atualizarProtocolo(protocoloId, {
+  await atualizarProtocolo(protocoloId, {
     titulo,
     questaoPesquisa: textoDoCampo(formData, "questaoPesquisa") || null,
     anoInicio,
@@ -63,7 +63,7 @@ export async function salvarProtocolo(
       };
     }
 
-    salvarCriterios(protocoloId, recebidos);
+    await salvarCriterios(protocoloId, recebidos);
   }
 
   revalidatePath(`/protocolos/${protocoloId}`);

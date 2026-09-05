@@ -1,11 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, rmSync } from "node:fs";
-import Database from "better-sqlite3";
+import { readFileSync } from "node:fs";
+import { sql as sqlBruto } from "drizzle-orm";
 
-const ARQUIVO_DE_TESTE = "teste-integracao.db";
-const ARQUIVO_DE_REFERENCIA = "revisa.db";
+const URL_DE_TESTE = readFileSync(".env.local", "utf8").match(
+  /DATABASE_URL_TESTE="([^"]+)"/,
+)?.[1];
 
-process.env.DATABASE_FILE = ARQUIVO_DE_TESTE;
+if (!URL_DE_TESTE) {
+  console.error("DATABASE_URL_TESTE não encontrada em .env.local");
+  process.exit(1);
+}
+
+// Precisa vir antes de qualquer import de src/db/client, que lê esta
+// variável ao ser carregado.
+process.env.DATABASE_URL = URL_DE_TESTE;
 
 let verificacoesQuePassaram = 0;
 let verificacoesQueFalharam = 0;
@@ -22,44 +30,23 @@ function checar(descricao: string, obtido: unknown, esperado: unknown): void {
 
   verificacoesQueFalharam++;
   console.log(
-    `  FALHA ${descricao}\n        esperado: ${esperadoSerializado}\n        obtido:   ${obtidoSerializado}`,
+    `  FALHA ${descricao}
+        esperado: ${esperadoSerializado}
+        obtido:   ${obtidoSerializado}`,
   );
 }
-
-function apagarBancoDeTeste(): void {
-  for (const sufixo of ["", "-wal", "-shm"]) {
-    if (existsSync(`${ARQUIVO_DE_TESTE}${sufixo}`)) {
-      rmSync(`${ARQUIVO_DE_TESTE}${sufixo}`);
-    }
-  }
-}
-
-function criarEsquema(): void {
-  if (!existsSync(ARQUIVO_DE_REFERENCIA)) {
-    console.error(
-      `${ARQUIVO_DE_REFERENCIA} não existe. Rode "npm run db:push" antes.`,
-    );
-    process.exit(1);
-  }
-
-  const destino = new Database(ARQUIVO_DE_TESTE);
-  const referencia = new Database(ARQUIVO_DE_REFERENCIA);
-  const definicoes = referencia
-    .prepare("select sql from sqlite_master where sql is not null")
-    .all() as { sql: string }[];
-
-  for (const { sql } of definicoes) destino.exec(sql);
-  referencia.close();
-  destino.close();
-}
-
-apagarBancoDeTeste();
-criarEsquema();
 
 // Import dinâmico: `src/db/client` lê DATABASE_FILE ao ser carregado, e
 // um `import` estático seria içado para antes da atribuição acima — o
 // teste rodaria contra o banco de desenvolvimento sem avisar.
 const { db, fecharBanco } = await import("../src/db/client");
+
+// O banco de teste é um database separado no mesmo projeto Neon; limpar as
+// tabelas substitui o "apagar o arquivo" que o SQLite permitia.
+await db.execute(
+  sqlBruto`truncate table extracao, atendimento, estudo_busca, triagem,
+    campo_extracao, estudo, busca, criterio, protocolo restart identity cascade`,
+);
 const { criterio, estudoBusca, protocolo } = await import("../src/db/schema");
 const {
   contarPorDecisao,
@@ -144,23 +131,21 @@ const ARTIGOS_DA_IEEE = String.raw`
 `;
 
 const protocoloId = randomUUID();
-db.insert(protocolo)
-  .values({ id: protocoloId, titulo: "Protocolo de teste", anoInicio: 2020, anoFim: 2024 })
-  .run();
+await db.insert(protocolo)
+  .values({ id: protocoloId, titulo: "Protocolo de teste", anoInicio: 2020, anoFim: 2024 });
 
-db.insert(criterio)
+await db.insert(criterio)
   .values([
     { id: randomUUID(), protocoloId, tipo: "exclusao", codigo: "EC1", descricao: "Fora do escopo", ordem: 0 },
     { id: randomUUID(), protocoloId, tipo: "exclusao", codigo: "EC2", descricao: "Não é estudo primário", ordem: 1 },
-  ])
-  .run();
+  ]);
 
 console.log("\nBanco de teste isolado");
-const estudosNoInicio = db.select().from(estudoBusca).all();
+const estudosNoInicio = await db.select().from(estudoBusca);
 checar("começa vazio", estudosNoInicio.length, 0);
 
 console.log("\nPrimeira importação (Scopus)");
-const daScopus = importarParaOProtocolo({
+const daScopus = await importarParaOProtocolo({
   protocoloId,
   base: "Scopus",
   stringBusca: 'TITLE-ABS-KEY("code review")',
@@ -172,7 +157,7 @@ checar("estudos importados", daScopus.importados, 3);
 checar("nada preexistente", daScopus.jaExistiamNoProtocolo, 0);
 
 console.log("\nSegunda importação (IEEE, com um artigo repetido)");
-const daIeee = importarParaOProtocolo({
+const daIeee = await importarParaOProtocolo({
   protocoloId,
   base: "IEEE Xplore",
   stringBusca: '("code review") AND ("systematic")',
@@ -182,10 +167,10 @@ const daIeee = importarParaOProtocolo({
 checar("só o inédito entra", daIeee.importados, 1);
 checar("repetido é reconhecido pelo DOI", daIeee.jaExistiamNoProtocolo, 1);
 
-const todosOsEstudos = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+const todosOsEstudos = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 checar("total sem duplicata", todosOsEstudos.length, 4);
 
-const vinculos = db.select().from(estudoBusca).all();
+const vinculos = await db.select().from(estudoBusca);
 checar("vínculos estudo-busca", vinculos.length, 5);
 
 const estudoRepetido = todosOsEstudos.find(
@@ -205,7 +190,7 @@ checar(
 console.log("\nImportação sem entrada válida");
 const buscasAntes = daScopus.buscaId !== null;
 checar("importação válida gerou busca", buscasAntes, true);
-const vazia = importarParaOProtocolo({
+const vazia = await importarParaOProtocolo({
   protocoloId,
   base: "SciELO",
   stringBusca: "nada",
@@ -216,62 +201,62 @@ checar("nenhuma busca é gravada", vazia.buscaId, null);
 checar("nenhum estudo é criado", vazia.importados, 0);
 
 console.log("\nTriagem");
-const criterios = listarCriteriosDeExclusao(protocoloId);
+const criterios = await listarCriteriosDeExclusao(protocoloId);
 checar("critérios de exclusão listados", criterios.length, 2);
 
-salvarDecisao({
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[0]!.id,
   decisao: "incluido",
   criterioId: null,
 });
-salvarDecisao({
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[1]!.id,
   decisao: "excluido",
   criterioId: criterios[0]!.id,
 });
-salvarDecisao({
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[2]!.id,
   decisao: "duvida",
   criterioId: null,
 });
 
-const contagem = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
+const contagem = await contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("incluídos", contagem.incluido, 1);
 checar("excluídos", contagem.excluido, 1);
 checar("em dúvida", contagem.duvida, 1);
 checar("pendentes", contagem.pendente, 1);
 checar("total", contagem.total, 4);
 
-salvarDecisao({
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: todosOsEstudos[0]!.id,
   decisao: "excluido",
   criterioId: criterios[1]!.id,
 });
-const aposMudarDeIdeia = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
+const aposMudarDeIdeia = await contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("decisão substituída, não duplicada", aposMudarDeIdeia.total, 4);
 checar("passou a contar como excluído", aposMudarDeIdeia.excluido, 2);
 checar("não é mais incluído", aposMudarDeIdeia.incluido, 0);
 
-removerDecisao(todosOsEstudos[0]!.id, TRIAGEM_INICIAL);
-const aposDesfazer = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
+await removerDecisao(todosOsEstudos[0]!.id, TRIAGEM_INICIAL);
+const aposDesfazer = await contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("desfazer devolve para pendente", aposDesfazer.pendente, 2);
 
 console.log("\nLista de incluídos");
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[0]!.id, decisao: "incluido", criterioId: null });
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[3]!.id, decisao: "incluido", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[0]!.id, decisao: "incluido", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[3]!.id, decisao: "incluido", criterioId: null });
 
-const comDecisoes = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+const comDecisoes = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 const listaDeIncluidos = comDecisoes.filter((e) => e.decisao === "incluido");
 checar("dois incluídos na lista", listaDeIncluidos.length, 2);
 checar(
   "retirar da lista devolve para pendente",
-  (() => {
-    removerDecisao(todosOsEstudos[3]!.id, TRIAGEM_INICIAL);
-    return listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).filter(
+  await (async () => {
+    await removerDecisao(todosOsEstudos[3]!.id, TRIAGEM_INICIAL);
+    return (await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)).filter(
       (e) => e.decisao === "incluido",
     ).length;
   })(),
@@ -279,84 +264,83 @@ checar(
 );
 
 console.log("\nZerar triagem");
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[1]!.id, decisao: "duvida", criterioId: null });
-const antesDeZerar = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: todosOsEstudos[1]!.id, decisao: "duvida", criterioId: null });
+const antesDeZerar = await contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("ha decisoes antes de zerar", antesDeZerar.total - antesDeZerar.pendente, 3);
 
 const outroProtocoloId = randomUUID();
-db.insert(protocolo)
-  .values({ id: outroProtocoloId, titulo: "Outro protocolo", anoInicio: 2020, anoFim: 2024 })
-  .run();
-importarParaOProtocolo({
+await db.insert(protocolo)
+  .values({ id: outroProtocoloId, titulo: "Outro protocolo", anoInicio: 2020, anoFim: 2024 });
+await importarParaOProtocolo({
   protocoloId: outroProtocoloId,
   base: "ACM",
   stringBusca: "outra",
   executadaEmSegundos: Math.floor(Date.now() / 1000),
   conteudo: ARTIGOS_DA_SCOPUS,
 });
-const doOutroProtocolo = listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL);
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: doOutroProtocolo[0]!.id, decisao: "incluido", criterioId: null });
+const doOutroProtocolo = await listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL);
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: doOutroProtocolo[0]!.id, decisao: "incluido", criterioId: null });
 
-checar("apaga todas as decisoes do protocolo", removerTodasAsDecisoes(protocoloId), 3);
+checar("apaga todas as decisoes do protocolo", await removerTodasAsDecisoes(protocoloId), 3);
 
-const aposZerar = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
+const aposZerar = await contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
 checar("tudo volta a pendente", aposZerar.pendente, aposZerar.total);
-checar("estudos permanecem", listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).length, 4);
-checar("protocolo vizinho nao e afetado", contarPorDecisao(outroProtocoloId, TRIAGEM_INICIAL).incluido, 1);
-checar("zerar de novo nao apaga nada", removerTodasAsDecisoes(protocoloId), 0);
+checar("estudos permanecem", (await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)).length, 4);
+checar("protocolo vizinho nao e afetado", (await contarPorDecisao(outroProtocoloId, TRIAGEM_INICIAL)).incluido, 1);
+checar("zerar de novo nao apaga nada", await removerTodasAsDecisoes(protocoloId), 0);
 
 console.log("\nDescartar artigo");
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: doOutroProtocolo[1]!.id, decisao: "duvida", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: doOutroProtocolo[1]!.id, decisao: "duvida", criterioId: null });
 const alvo = doOutroProtocolo[1]!;
-const vinculosAntes = db.select().from(estudoBusca).all().length;
+const vinculosAntes = (await db.select().from(estudoBusca)).length;
 
-checar("descarta um estudo", descartarEstudo(alvo.id), 1);
+checar("descarta um estudo", await descartarEstudo(alvo.id), 1);
 checar(
   "estudo some da lista",
-  listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL).some((e) => e.id === alvo.id),
+  (await listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL)).some((e) => e.id === alvo.id),
   false,
 );
 checar(
   "decisao vai junto (cascade)",
-  db.select().from(triagem).all().some((t) => t.estudoId === alvo.id),
+  (await db.select().from(triagem)).some((t) => t.estudoId === alvo.id),
   false,
 );
 checar(
   "vinculo estudo-busca vai junto (cascade)",
-  db.select().from(estudoBusca).all().length < vinculosAntes,
+  (await db.select().from(estudoBusca)).length < vinculosAntes,
   true,
 );
-checar("descartar de novo nao apaga nada", descartarEstudo(alvo.id), 0);
-checar("busca permanece", db.select().from(busca).all().length > 0, true);
+checar("descartar de novo nao apaga nada", await descartarEstudo(alvo.id), 0);
+checar("busca permanece", (await db.select().from(busca)).length > 0, true);
 
 console.log("\nDescartar tudo do protocolo");
-const estudosDoOutro = listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL).length;
-const buscasDoOutro = db.select().from(busca).all()
+const estudosDoOutro = (await listarEstudosParaEstagio(outroProtocoloId, TRIAGEM_INICIAL)).length;
+const buscasDoOutro = (await db.select().from(busca))
   .filter((b) => b.protocoloId === outroProtocoloId).length;
 
-const descarte = descartarTudoDoProtocolo(outroProtocoloId);
+const descarte = await descartarTudoDoProtocolo(outroProtocoloId);
 checar("remove os estudos", descarte.estudosRemovidos, estudosDoOutro);
 checar("remove as buscas", descarte.buscasRemovidas, buscasDoOutro);
-checar("protocolo fica vazio", contarPorDecisao(outroProtocoloId, TRIAGEM_INICIAL).total, 0);
+checar("protocolo fica vazio", (await contarPorDecisao(outroProtocoloId, TRIAGEM_INICIAL)).total, 0);
 checar(
   "criterios do protocolo permanecem",
-  listarCriteriosDeExclusao(protocoloId).length,
+  (await listarCriteriosDeExclusao(protocoloId)).length,
   2,
 );
 checar(
   "protocolo vizinho mantem seus estudos",
-  listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).length,
+  (await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)).length,
   4,
 );
 checar(
   "buscas do vizinho permanecem",
-  db.select().from(busca).all().filter((b) => b.protocoloId === protocoloId).length > 0,
+  (await db.select().from(busca)).filter((b) => b.protocoloId === protocoloId).length > 0,
   true,
 );
 
 console.log("");
 console.log("Origem dos estudos");
-const comOrigem = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+const comOrigem = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 const repetidoNasDuas = comOrigem.find((e) => e.doi === "10.1109/tse.2023.1234567")!;
 checar("artigo repetido mostra as duas bases", repetidoNasDuas.bases.length, 2);
 checar(
@@ -375,30 +359,30 @@ checar(
 
 console.log("");
 console.log("Protocolo e criterios");
-atualizarProtocolo(protocoloId, {
+await atualizarProtocolo(protocoloId, {
   titulo: "Revisao renomeada",
   questaoPesquisa: "Qual a pergunta?",
   anoInicio: 2019,
   anoFim: 2025,
 });
-const protocoloSalvo = db.select().from(protocolo).all()
+const protocoloSalvo = (await db.select().from(protocolo))
   .find((p) => p.id === protocoloId)!;
 checar("titulo atualizado", protocoloSalvo.titulo, "Revisao renomeada");
 checar("pergunta gravada", protocoloSalvo.questaoPesquisa, "Qual a pergunta?");
 checar("recorte gravado", [protocoloSalvo.anoInicio, protocoloSalvo.anoFim], [2019, 2025]);
 
-const criteriosOriginais = listarCriteriosEditaveis(protocoloId);
+const criteriosOriginais = await listarCriteriosEditaveis(protocoloId);
 checar("dois criterios existentes", criteriosOriginais.length, 2);
 
-const estudosVivos = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
-salvarDecisao({
+const estudosVivos = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: estudosVivos[0]!.id,
   decisao: "excluido",
   criterioId: criteriosOriginais[0]!.id,
 });
 
-const criteriosAntes = listarCriteriosEditaveis(protocoloId);
+const criteriosAntes = await listarCriteriosEditaveis(protocoloId);
 checar(
   "uso em exclusoes e contado",
   criteriosAntes.find((c) => c.id === criteriosOriginais[0]!.id)!.usadoEmExclusoes,
@@ -410,7 +394,7 @@ checar(
   0,
 );
 
-const resumo = salvarCriterios(protocoloId, [
+const resumo = await salvarCriterios(protocoloId, [
   { id: criteriosAntes[0]!.id, tipo: "exclusao", descricao: "Descricao editada" },
   { id: null, tipo: "exclusao", descricao: "Criterio novo" },
   { id: null, tipo: "inclusao", descricao: "Estudo primario" },
@@ -419,7 +403,7 @@ checar("um removido", resumo.removidos, 1);
 checar("um atualizado", resumo.atualizados, 1);
 checar("dois criados", resumo.criados, 2);
 
-const criteriosDepois = listarCriteriosEditaveis(protocoloId);
+const criteriosDepois = await listarCriteriosEditaveis(protocoloId);
 checar("total apos gravar", criteriosDepois.length, 3);
 checar(
   "codigo do existente nao muda",
@@ -438,24 +422,24 @@ checar(
 );
 checar(
   "descricao vazia e ignorada",
-  salvarCriterios(protocoloId, [
+  (await salvarCriterios(protocoloId, [
     ...criteriosDepois.map((c) => ({ id: c.id, tipo: c.tipo, descricao: c.descricao })),
     { id: null, tipo: "exclusao" as const, descricao: "   " },
-  ]).criados,
+  ])).criados,
   0,
 );
 
 console.log("");
 console.log("Funil entre as fases");
-const paraOFunil = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
-removerTodasAsDecisoes(protocoloId);
+const paraOFunil = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+await removerTodasAsDecisoes(protocoloId);
 
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[0]!.id, decisao: "incluido", criterioId: null });
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[1]!.id, decisao: "incluido", criterioId: null });
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[2]!.id, decisao: "excluido", criterioId: null });
-salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[3]!.id, decisao: "duvida", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[0]!.id, decisao: "incluido", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[1]!.id, decisao: "incluido", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[2]!.id, decisao: "excluido", criterioId: null });
+await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: paraOFunil[3]!.id, decisao: "duvida", criterioId: null });
 
-const naLeitura = listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA);
+const naLeitura = await listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA);
 checar("so os incluidos passam para a fase 2", naLeitura.length, 2);
 checar(
   "excluido na fase 1 nao aparece",
@@ -469,34 +453,34 @@ checar(
 );
 checar("nenhum estudo duplicado", new Set(naLeitura.map((e) => e.id)).size, 2);
 
-const contagemDaLeitura = contarPorDecisao(protocoloId, LEITURA_COMPLETA);
+const contagemDaLeitura = await contarPorDecisao(protocoloId, LEITURA_COMPLETA);
 checar("contagem da fase 2 respeita o funil", contagemDaLeitura.total, 2);
 checar("todos pendentes na fase 2", contagemDaLeitura.pendente, 2);
 
-salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: naLeitura[0]!.id, decisao: "excluido", criterioId: null });
-checar("decisao da fase 2 conta na fase 2", contarPorDecisao(protocoloId, LEITURA_COMPLETA).excluido, 1);
+await salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: naLeitura[0]!.id, decisao: "excluido", criterioId: null });
+checar("decisao da fase 2 conta na fase 2", (await contarPorDecisao(protocoloId, LEITURA_COMPLETA)).excluido, 1);
 checar(
   "decisao da fase 2 nao altera a fase 1",
-  contarPorDecisao(protocoloId, TRIAGEM_INICIAL).incluido,
+  (await contarPorDecisao(protocoloId, TRIAGEM_INICIAL)).incluido,
   2,
 );
 checar(
   "fase 1 nao duplica com decisao nos dois estagios",
-  listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL).length,
+  (await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)).length,
   4,
 );
 
-removerDecisao(paraOFunil[0]!.id, TRIAGEM_INICIAL);
+await removerDecisao(paraOFunil[0]!.id, TRIAGEM_INICIAL);
 checar(
   "tirar da fase 1 remove da fase 2",
-  listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA).length,
+  (await listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA)).length,
   1,
 );
 
 console.log("");
 console.log("Criterios por tipo");
-const deExclusao = listarCriteriosDeExclusao(protocoloId);
-const deInclusao = listarCriteriosDeInclusao(protocoloId);
+const deExclusao = await listarCriteriosDeExclusao(protocoloId);
+const deInclusao = await listarCriteriosDeInclusao(protocoloId);
 
 checar("exclusao traz so tipo exclusao", deExclusao.length, 2);
 checar("inclusao traz so tipo inclusao", deInclusao.length, 1);
@@ -514,21 +498,21 @@ checar(
 
 console.log("");
 console.log("Extracao");
-const antesDaExtracao = listarEstudosParaExtracao(protocoloId);
+const antesDaExtracao = await listarEstudosParaExtracao(protocoloId);
 checar("nada extrai sem inclusao na fase 2", antesDaExtracao.length, 0);
 
-const naFase2 = listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA);
-salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: naFase2[0]!.id, decisao: "incluido", criterioId: null });
+const naFase2 = await listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA);
+await salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: naFase2[0]!.id, decisao: "incluido", criterioId: null });
 
-const paraExtrair = listarEstudosParaExtracao(protocoloId);
+const paraExtrair = await listarEstudosParaExtracao(protocoloId);
 checar("so o incluido na fase 2 entra", paraExtrair.length, 1);
 checar("autor ja vem preenchido", paraExtrair[0]!.autores.length > 0, true);
 checar("ano ja vem preenchido", typeof paraExtrair[0]!.ano, "number");
 
-checar("cria as colunas padrao", criarCamposPadrao(protocoloId), 4);
-checar("nao recria se ja existem", criarCamposPadrao(protocoloId), 0);
+checar("cria as colunas padrao", await criarCamposPadrao(protocoloId), 4);
+checar("nao recria se ja existem", await criarCamposPadrao(protocoloId), 0);
 
-const camposCriados = listarCampos(protocoloId);
+const camposCriados = await listarCampos(protocoloId);
 checar("nomes das colunas", camposCriados.map((c) => c.nome), [
   "Objetivo",
   "Metodologia",
@@ -542,66 +526,66 @@ checar(
 );
 
 const alvoDaExtracao = paraExtrair[0]!;
-salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Detectar anomalias");
+await salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Detectar anomalias");
 checar(
   "valor gravado aparece na leitura",
-  listarEstudosParaExtracao(protocoloId)[0]!.valores[camposCriados[0]!.id],
+  (await listarEstudosParaExtracao(protocoloId))[0]!.valores[camposCriados[0]!.id],
   "Detectar anomalias",
 );
-checar("progresso conta preenchidos", listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos, 1);
+checar("progresso conta preenchidos", (await listarEstudosParaExtracao(protocoloId))[0]!.camposPreenchidos, 1);
 
-salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Objetivo revisado");
+await salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Objetivo revisado");
 checar(
   "regravar substitui, nao duplica",
-  listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
+  (await listarEstudosParaExtracao(protocoloId))[0]!.camposPreenchidos,
   1,
 );
 checar(
   "valor atualizado",
-  listarEstudosParaExtracao(protocoloId)[0]!.valores[camposCriados[0]!.id],
+  (await listarEstudosParaExtracao(protocoloId))[0]!.valores[camposCriados[0]!.id],
   "Objetivo revisado",
 );
 
-salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "   ");
+await salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "   ");
 checar(
   "valor em branco apaga a celula",
-  listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
+  (await listarEstudosParaExtracao(protocoloId))[0]!.camposPreenchidos,
   0,
 );
 
 for (const campo of camposCriados) {
-  salvarValorExtraido(alvoDaExtracao.id, campo.id, `conteudo de ${campo.nome}`);
+  await salvarValorExtraido(alvoDaExtracao.id, campo.id, `conteudo de ${campo.nome}`);
 }
-const progresso = medirProgresso(protocoloId);
+const progresso = await medirProgresso(protocoloId);
 checar("estudo completo e contado", progresso.completos, 1);
 checar("total de colunas no progresso", progresso.campos, 4);
 
-const novaColuna = adicionarCampo(protocoloId, "Risco de vies", "opcoes", ["alto", "baixo"]);
-checar("coluna adicionada", listarCampos(protocoloId).length, 5);
+const novaColuna = await adicionarCampo(protocoloId, "Risco de vies", "opcoes", ["alto", "baixo"]);
+checar("coluna adicionada", (await listarCampos(protocoloId)).length, 5);
 checar(
   "estudo deixa de estar completo com coluna nova",
-  medirProgresso(protocoloId).completos,
+  (await medirProgresso(protocoloId)).completos,
   0,
 );
 
-salvarValorExtraido(alvoDaExtracao.id, novaColuna, "baixo");
-checar("completo de novo apos preencher", medirProgresso(protocoloId).completos, 1);
+await salvarValorExtraido(alvoDaExtracao.id, novaColuna, "baixo");
+checar("completo de novo apos preencher", (await medirProgresso(protocoloId)).completos, 1);
 
-checar("remover coluna", removerCampo(novaColuna), 1);
-checar("colunas restantes", listarCampos(protocoloId).length, 4);
+checar("remover coluna", await removerCampo(novaColuna), 1);
+checar("colunas restantes", (await listarCampos(protocoloId)).length, 4);
 checar(
   "valores da coluna removida somem junto",
-  listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
+  (await listarEstudosParaExtracao(protocoloId))[0]!.camposPreenchidos,
   4,
 );
 
 console.log("");
 console.log("Sintese e exportacao");
-const prisma = montarPrisma(protocoloId);
+const prisma = await montarPrisma(protocoloId);
 
-checar("triados batem com a fase 1", prisma.triados, contarPorDecisao(protocoloId, TRIAGEM_INICIAL).total);
-checar("fase 2 bate com o funil", prisma.avaliadosPorTextoCompleto, contarPorDecisao(protocoloId, LEITURA_COMPLETA).total);
-checar("incluidos batem com a extracao", prisma.incluidos, listarEstudosParaExtracao(protocoloId).length);
+checar("triados batem com a fase 1", prisma.triados, (await contarPorDecisao(protocoloId, TRIAGEM_INICIAL)).total);
+checar("fase 2 bate com o funil", prisma.avaliadosPorTextoCompleto, (await contarPorDecisao(protocoloId, LEITURA_COMPLETA)).total);
+checar("incluidos batem com a extracao", prisma.incluidos, (await listarEstudosParaExtracao(protocoloId)).length);
 checar(
   "identificados nunca menor que triados",
   prisma.identificados >= prisma.triados,
@@ -614,7 +598,7 @@ checar(
 );
 checar("buscas listadas", prisma.buscas.length > 0, true);
 
-const tabela = montarTabelaDeTrabalhos(protocoloId);
+const tabela = await montarTabelaDeTrabalhos(protocoloId);
 checar("colunas da tabela", tabela.colunas, [
   "Objetivo",
   "Metodologia",
@@ -624,7 +608,7 @@ checar("colunas da tabela", tabela.colunas, [
 checar(
   "uma linha por estudo incluido",
   tabela.linhas.length,
-  listarEstudosParaExtracao(protocoloId).length,
+  (await listarEstudosParaExtracao(protocoloId)).length,
 );
 checar(
   "cada linha tem uma celula por coluna",
@@ -639,101 +623,102 @@ checar(
 checar("ano em coluna propria", /^\d{4}$|^s\.d\.$/.test(tabela.linhas[0]!.ano), true);
 checar(
   "latex declara duas colunas simples antes das de texto",
-  tabelaEmLatex(protocoloId, "T").includes(String.raw`\begin{tabular}{ll`),
+  (await tabelaEmLatex(protocoloId, "T")).includes(String.raw`\begin{tabular}{ll`),
   true,
 );
 checar(
   "latex tem cabecalho de autor e ano",
-  tabelaEmLatex(protocoloId, "T").includes(String.raw`\textbf{Autor} & \textbf{Ano}`),
+  (await tabelaEmLatex(protocoloId, "T")).includes(String.raw`\textbf{Autor} & \textbf{Ano}`),
   true,
 );
 
-const incluidos = listarEstudosIncluidos(protocoloId);
+const incluidos = await listarEstudosIncluidos(protocoloId);
 checar("lista de incluidos bate com o prisma", incluidos.length, prisma.incluidos);
 checar("estudo incluido tem titulo", incluidos[0]!.titulo.length > 0, true);
 checar("estudo incluido tem link", incluidos[0]!.url !== null, true);
 checar("autores vem formatados", incluidos[0]!.autores.length > 0, true);
 
-const latex = tabelaEmLatex(protocoloId, "Revisao & Teste");
+const latex = await tabelaEmLatex(protocoloId, "Revisao & Teste");
 checar("latex abre o ambiente table", latex.includes(String.raw`\begin{table}`), true);
 checar("e comercial escapado no caption", latex.includes(String.raw`Revisao \& Teste`), true);
 
-const metodologia = textoDaMetodologia(protocoloId);
+const metodologia = await textoDaMetodologia(protocoloId);
 checar("metodologia cita os incluidos", metodologia.includes(`${prisma.incluidos} estudo(s) compuseram`), true);
 checar("metodologia cita as bases", metodologia.includes("base(s) de dados"), true);
 
 
 console.log("");
 console.log("Checklist de inclusao");
-const criteriosParaChecar = listarCriteriosDeInclusao(protocoloId);
+const criteriosParaChecar = await listarCriteriosDeInclusao(protocoloId);
 checar("ha criterio de inclusao", criteriosParaChecar.length > 0, true);
 
-const paraChecar = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+const paraChecar = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 const estudoChecado = paraChecar[0]!;
 
 checar("comeca sem nada marcado", estudoChecado.criteriosAtendidos.length, 0);
 
-marcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
+await marcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
 checar(
   "marcacao e persistida",
-  agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id),
+  (await agruparAtendimentosPorEstudo(protocoloId)).get(estudoChecado.id),
   [criteriosParaChecar[0]!.id],
 );
 checar(
   "marcacao aparece na listagem",
-  listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)
-    .find((e) => e.id === estudoChecado.id)!.criteriosAtendidos.length,
+  (await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)).find(
+    (e) => e.id === estudoChecado.id,
+  )!.criteriosAtendidos.length,
   1,
 );
 
-marcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
+await marcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
 checar(
   "marcar duas vezes nao duplica",
-  agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id)!.length,
+  (await agruparAtendimentosPorEstudo(protocoloId)).get(estudoChecado.id)!.length,
   1,
 );
 
 checar(
   "outro estudo nao e afetado",
-  agruparAtendimentosPorEstudo(protocoloId).get(paraChecar[1]!.id) ?? [],
+  (await agruparAtendimentosPorEstudo(protocoloId)).get(paraChecar[1]!.id) ?? [],
   [],
 );
 
-desmarcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
+await desmarcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
 checar(
   "desmarcar remove",
-  agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id) ?? [],
+  (await agruparAtendimentosPorEstudo(protocoloId)).get(estudoChecado.id) ?? [],
   [],
 );
 
 console.log("");
 console.log("Funil da fase 1 ate a extracao");
-removerTodasAsDecisoes(protocoloId);
-const noFunil = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+await removerTodasAsDecisoes(protocoloId);
+const noFunil = await listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
 
-noFunil.slice(0, 3).forEach((e) =>
-  salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: e.id, decisao: "incluido", criterioId: null }),
-);
-listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA).forEach((e) =>
-  salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: e.id, decisao: "incluido", criterioId: null }),
-);
-checar("tres chegam a extracao", listarEstudosParaExtracao(protocoloId).length, 3);
+for (const e of noFunil.slice(0, 3)) {
+  await salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: e.id, decisao: "incluido", criterioId: null });
+}
+for (const e of await listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA)) {
+  await salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: e.id, decisao: "incluido", criterioId: null });
+}
+checar("tres chegam a extracao", (await listarEstudosParaExtracao(protocoloId)).length, 3);
 
-salvarDecisao({
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: noFunil[0]!.id,
   decisao: "excluido",
   criterioId: null,
 });
-checar("excluir na fase 1 tira da extracao", listarEstudosParaExtracao(protocoloId).length, 2);
+checar("excluir na fase 1 tira da extracao", (await listarEstudosParaExtracao(protocoloId)).length, 2);
 checar(
   "e apaga a decisao de leitura, sem deixar orfao",
-  db.select().from(triagem).all()
+  (await db.select().from(triagem))
     .filter((t) => t.estudoId === noFunil[0]!.id && t.estagio === "texto_completo").length,
   0,
 );
 
-salvarDecisao({
+await salvarDecisao({
   estagio: TRIAGEM_INICIAL,
   estudoId: noFunil[0]!.id,
   decisao: "incluido",
@@ -741,21 +726,21 @@ salvarDecisao({
 });
 checar(
   "reincluir na fase 1 devolve como pendente na fase 2",
-  listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA)
-    .find((e) => e.id === noFunil[0]!.id)!.decisao,
+  (await listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA)).find(
+    (e) => e.id === noFunil[0]!.id,
+  )!.decisao,
   null,
 );
-checar("e nao volta direto para a extracao", listarEstudosParaExtracao(protocoloId).length, 2);
+checar("e nao volta direto para a extracao", (await listarEstudosParaExtracao(protocoloId)).length, 2);
 
-removerDecisao(noFunil[1]!.id, TRIAGEM_INICIAL);
-checar("limpar decisao da fase 1 tambem limpa a fase 2", listarEstudosParaExtracao(protocoloId).length, 1);
+await removerDecisao(noFunil[1]!.id, TRIAGEM_INICIAL);
+checar("limpar decisao da fase 1 tambem limpa a fase 2", (await listarEstudosParaExtracao(protocoloId)).length, 1);
 
 console.log("");
 console.log("Busca repetida");
 const protocoloDaBusca = randomUUID();
-db.insert(protocolo)
-  .values({ id: protocoloDaBusca, titulo: "Busca repetida", anoInicio: 2020, anoFim: 2026 })
-  .run();
+await db.insert(protocolo)
+  .values({ id: protocoloDaBusca, titulo: "Busca repetida", anoInicio: 2020, anoFim: 2026 });
 
 const artigo = (n: number) =>
   String.raw`@article{r${n}, author={Silva, J.}, title={Artigo ${n}}, year={2024}, doi={10.1109/tse.2024.${n}}}`;
@@ -768,37 +753,37 @@ const dadosDaBusca = {
 
 checar(
   "nao ha busca identica antes da primeira",
-  encontrarBuscaIdentica(protocoloDaBusca, "Google Scholar", "mesma string", 1000),
+  await encontrarBuscaIdentica(protocoloDaBusca, "Google Scholar", "mesma string", 1000),
   null,
 );
 
-importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(1) });
-const identica = encontrarBuscaIdentica(protocoloDaBusca, "Google Scholar", "mesma string", 1000)!;
+await importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(1) });
+const identica = (await encontrarBuscaIdentica(protocoloDaBusca, "Google Scholar", "mesma string", 1000))!;
 checar("busca identica e detectada", identica !== null, true);
 checar("ja tem um registro vinculado", identica.registrosJaVinculados, 1);
 
-importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(2), anexarABusca: identica.id });
-const buscasDoProtocolo = db.select().from(busca).all()
+await importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(2), anexarABusca: identica.id });
+const buscasDoProtocolo = (await db.select().from(busca))
   .filter((b) => b.protocoloId === protocoloDaBusca);
 checar("anexar nao cria busca nova", buscasDoProtocolo.length, 1);
 checar("total de resultados acompanha o anexo", buscasDoProtocolo[0]!.totalResultados, 2);
 checar(
   "os dois estudos existem",
-  listarEstudosParaEstagio(protocoloDaBusca, TRIAGEM_INICIAL).length,
+  (await listarEstudosParaEstagio(protocoloDaBusca, TRIAGEM_INICIAL)).length,
   2,
 );
 
-importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(2), anexarABusca: identica.id });
+await importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(2), anexarABusca: identica.id });
 checar(
   "reanexar o mesmo artigo nao infla o total",
-  db.select().from(busca).all().find((b) => b.id === identica.id)!.totalResultados,
+  (await db.select().from(busca)).find((b) => b.id === identica.id)!.totalResultados,
   2,
 );
 
-importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(3), executadaEmSegundos: 2000 });
+await importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(3), executadaEmSegundos: 2000 });
 checar(
   "data diferente cria busca nova",
-  db.select().from(busca).all().filter((b) => b.protocoloId === protocoloDaBusca).length,
+  (await db.select().from(busca)).filter((b) => b.protocoloId === protocoloDaBusca).length,
   2,
 );
 

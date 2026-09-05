@@ -1,5 +1,5 @@
 import { and, eq, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/sqlite-core";
+import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { busca, criterio, estudo, estudoBusca, protocolo, triagem } from "@/db/schema";
 import { agruparAtendimentosPorEstudo } from "@/lib/atendimento";
@@ -40,19 +40,24 @@ export interface CriterioDoProtocolo {
   descricao: string;
 }
 
-export function buscarProtocolo(protocoloId: string) {
-  return db.select().from(protocolo).where(eq(protocolo.id, protocoloId)).get();
+export async function buscarProtocolo(protocoloId: string) {
+  const [encontrado] = await db
+    .select()
+    .from(protocolo)
+    .where(eq(protocolo.id, protocoloId));
+
+  return encontrado;
 }
 
-export function listarProtocolos() {
-  return db.select().from(protocolo).orderBy(protocolo.criadoEm).all();
+export async function listarProtocolos() {
+  return await db.select().from(protocolo).orderBy(protocolo.criadoEm);
 }
 
-function listarCriteriosDoTipo(
+async function listarCriteriosDoTipo(
   protocoloId: string,
   tipo: "inclusao" | "exclusao",
-): CriterioDoProtocolo[] {
-  return db
+): Promise<CriterioDoProtocolo[]> {
+  return await db
     .select({
       id: criterio.id,
       codigo: criterio.codigo,
@@ -60,26 +65,24 @@ function listarCriteriosDoTipo(
     })
     .from(criterio)
     .where(and(eq(criterio.protocoloId, protocoloId), eq(criterio.tipo, tipo)))
-    .orderBy(criterio.ordem)
-    .all();
+    .orderBy(criterio.ordem);
 }
 
-export function listarCriteriosDeExclusao(protocoloId: string): CriterioDoProtocolo[] {
-  return listarCriteriosDoTipo(protocoloId, "exclusao");
+export async function listarCriteriosDeExclusao(protocoloId: string): Promise<CriterioDoProtocolo[]> {
+  return await listarCriteriosDoTipo(protocoloId, "exclusao");
 }
 
-export function listarCriteriosDeInclusao(protocoloId: string): CriterioDoProtocolo[] {
-  return listarCriteriosDoTipo(protocoloId, "inclusao");
+export async function listarCriteriosDeInclusao(protocoloId: string): Promise<CriterioDoProtocolo[]> {
+  return await listarCriteriosDoTipo(protocoloId, "inclusao");
 }
 
-function agruparBasesPorEstudo(protocoloId: string): Map<string, string[]> {
-  const origens = db
+async function agruparBasesPorEstudo(protocoloId: string): Promise<Map<string, string[]>> {
+  const origens = await db
     .select({ estudoId: estudoBusca.estudoId, base: busca.base })
     .from(estudoBusca)
     .innerJoin(busca, eq(busca.id, estudoBusca.buscaId))
     .where(eq(busca.protocoloId, protocoloId))
-    .orderBy(busca.executadaEm)
-    .all();
+    .orderBy(busca.executadaEm);
 
   const porEstudo = new Map<string, string[]>();
 
@@ -112,14 +115,14 @@ const juncaoComEtapaAnterior = and(
   eq(decisaoDaEtapaAnterior.estagio, TRIAGEM_INICIAL),
 );
 
-export function listarEstudosParaEstagio(
+export async function listarEstudosParaEstagio(
   protocoloId: string,
   estagio: EstagioDeTriagem,
-): EstudoParaTriagem[] {
-  const basesPorEstudo = agruparBasesPorEstudo(protocoloId);
-  const atendidosPorEstudo = agruparAtendimentosPorEstudo(protocoloId);
+): Promise<EstudoParaTriagem[]> {
+  const basesPorEstudo = await agruparBasesPorEstudo(protocoloId);
+  const atendidosPorEstudo = await agruparAtendimentosPorEstudo(protocoloId);
 
-  const linhas = db
+  const linhas = await db
     .select({
       id: estudo.id,
       titulo: estudo.titulo,
@@ -142,8 +145,7 @@ export function listarEstudosParaEstagio(
     )
     .leftJoin(decisaoDaEtapaAnterior, juncaoComEtapaAnterior)
     .where(somenteDoEstagio(protocoloId, estagio))
-    .orderBy(estudo.criadoEm)
-    .all();
+    .orderBy(estudo.criadoEm);
 
   return linhas.map((linha) => ({
     ...linha,
@@ -160,14 +162,14 @@ export interface ContagemPorDecisao {
   total: number;
 }
 
-export function contarPorDecisao(
+export async function contarPorDecisao(
   protocoloId: string,
   estagio: EstagioDeTriagem,
-): ContagemPorDecisao {
-  const linhas = db
+): Promise<ContagemPorDecisao> {
+  const linhas = await db
     .select({
       decisao: triagem.decisao,
-      quantidade: sql<number>`count(distinct ${estudo.id})`,
+      quantidade: sql<number>`count(distinct ${estudo.id})::int`,
     })
     .from(estudo)
     .leftJoin(
@@ -176,8 +178,7 @@ export function contarPorDecisao(
     )
     .leftJoin(decisaoDaEtapaAnterior, juncaoComEtapaAnterior)
     .where(somenteDoEstagio(protocoloId, estagio))
-    .groupBy(triagem.decisao)
-    .all();
+    .groupBy(triagem.decisao);
 
   const contagem: ContagemPorDecisao = {
     incluido: 0,
@@ -196,12 +197,11 @@ export function contarPorDecisao(
   return contagem;
 }
 
-export function contarEstudos(protocoloId: string): number {
-  const linha = db
-    .select({ quantidade: sql<number>`count(*)` })
+export async function contarEstudos(protocoloId: string): Promise<number> {
+  const [linha] = await db
+    .select({ quantidade: sql<number>`count(*)::int` })
     .from(estudo)
-    .where(eq(estudo.protocoloId, protocoloId))
-    .get();
+    .where(eq(estudo.protocoloId, protocoloId));
 
-  return linha?.quantidade ?? 0;
+  return Number(linha?.quantidade ?? 0);
 }

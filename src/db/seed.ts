@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { db } from "./client";
+import { db, fecharBanco } from "./client";
 import { criterio, protocolo } from "./schema";
 
 const CRITERIOS_INICIAIS = [
@@ -12,20 +12,19 @@ const CRITERIOS_INICIAIS = [
   { tipo: "exclusao" as const, codigo: "EC5", descricao: "Duplicata de outro estudo já incluído" },
 ];
 
-function criarProtocoloDeExemplo(): string {
+async function criarProtocoloDeExemplo(): Promise<string> {
   const id = randomUUID();
 
-  db.insert(protocolo)
+  await db.insert(protocolo)
     .values({
       id,
       titulo: "Minha revisão sistemática",
       questaoPesquisa: "Qual a pergunta que esta revisão pretende responder?",
       anoInicio: new Date().getFullYear() - 5,
       anoFim: new Date().getFullYear(),
-    })
-    .run();
+    });
 
-  db.insert(criterio)
+  await db.insert(criterio)
     .values(
       CRITERIOS_INICIAIS.map((definicao, ordem) => ({
         id: randomUUID(),
@@ -33,18 +32,19 @@ function criarProtocoloDeExemplo(): string {
         ordem,
         ...definicao,
       })),
-    )
-    .run();
+    );
 
   return id;
 }
 
-const protocolosExistentes = db.select().from(protocolo).all();
+const protocolosExistentes = await db.select().from(protocolo);
 
 if (protocolosExistentes.length > 0) {
   console.log(`Já existem ${protocolosExistentes.length} protocolo(s). Nada a fazer.`);
 } else {
-  const id = criarProtocoloDeExemplo();
+  const id = await criarProtocoloDeExemplo();
   console.log(`Protocolo criado: ${id}`);
   console.log(`${CRITERIOS_INICIAIS.length} critérios cadastrados.`);
 }
+
+await fecharBanco();

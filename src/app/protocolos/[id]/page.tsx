@@ -1,4 +1,4 @@
-import { desc, eq, sql } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { busca } from "@/db/schema";
@@ -21,12 +21,12 @@ export default async function PaginaDoProtocolo({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const naTriagem = contarPorDecisao(id, TRIAGEM_INICIAL);
-  const naLeitura = contarPorDecisao(id, LEITURA_COMPLETA);
-  const naExtracao = medirProgresso(id);
+  const naTriagem = await contarPorDecisao(id, TRIAGEM_INICIAL);
+  const naLeitura = await contarPorDecisao(id, LEITURA_COMPLETA);
+  const naExtracao = await medirProgresso(id);
 
   const fase2Liberada = naTriagem.incluido > 0;
   const fase3Liberada = naLeitura.incluido > 0;
@@ -44,12 +44,11 @@ export default async function PaginaDoProtocolo({
 
   const destaque = (passo: string) =>
     `botao${proximoPasso === passo ? " botao-primario" : ""}`;
-  const buscas = db
+  const buscas = await db
     .select()
     .from(busca)
     .where(eq(busca.protocoloId, id))
-    .orderBy(desc(busca.executadaEm), sql`rowid desc`)
-    .all();
+    .orderBy(desc(busca.executadaEm), desc(busca.criadoEm));
 
   return (
     <>

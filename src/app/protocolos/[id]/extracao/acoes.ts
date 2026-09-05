@@ -15,7 +15,7 @@ function revalidarExtracao(protocoloId: string): void {
 }
 
 export async function usarCamposPadrao(protocoloId: string): Promise<void> {
-  criarCamposPadrao(protocoloId);
+  await criarCamposPadrao(protocoloId);
   revalidarExtracao(protocoloId);
 }
 
@@ -28,7 +28,7 @@ export async function criarCampo(
   const nomeLimpo = nome.trim();
   if (nomeLimpo === "") return;
 
-  adicionarCampo(protocoloId, nomeLimpo, tipo, opcoes);
+  await adicionarCampo(protocoloId, nomeLimpo, tipo, opcoes);
   revalidarExtracao(protocoloId);
 }
 
@@ -36,7 +36,7 @@ export async function excluirCampo(
   protocoloId: string,
   campoId: string,
 ): Promise<void> {
-  removerCampo(campoId);
+  await removerCampo(campoId);
   revalidarExtracao(protocoloId);
 }
 
@@ -46,6 +46,6 @@ export async function salvarValor(
   campoId: string,
   valor: string,
 ): Promise<void> {
-  salvarValorExtraido(estudoId, campoId, valor);
+  await salvarValorExtraido(estudoId, campoId, valor);
   revalidatePath(`/protocolos/${protocoloId}`);
 }

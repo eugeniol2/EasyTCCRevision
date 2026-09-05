@@ -10,7 +10,7 @@ export default async function PaginaDoProtocoloEditavel({
 }) {
   const { id } = await params;
 
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
   return (
@@ -35,7 +35,7 @@ export default async function PaginaDoProtocoloEditavel({
         questaoPesquisa={protocolo.questaoPesquisa}
         anoInicio={protocolo.anoInicio}
         anoFim={protocolo.anoFim}
-        criterios={listarCriteriosEditaveis(id)}
+        criterios={await listarCriteriosEditaveis(id)}
       />
     </>
   );

@@ -18,13 +18,13 @@ export default async function PaginaDeLeitura({
 }) {
   const { id } = await params;
 
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const estudos = listarEstudosParaEstagio(id, LEITURA_COMPLETA);
-  const naTriagem = contarPorDecisao(id, TRIAGEM_INICIAL);
+  const estudos = await listarEstudosParaEstagio(id, LEITURA_COMPLETA);
+  const naTriagem = await contarPorDecisao(id, TRIAGEM_INICIAL);
   const concluida =
-    estudos.length > 0 && contarPorDecisao(id, LEITURA_COMPLETA).pendente === 0;
+    estudos.length > 0 && (await contarPorDecisao(id, LEITURA_COMPLETA)).pendente === 0;
 
   return (
     <>
@@ -63,8 +63,8 @@ export default async function PaginaDeLeitura({
           protocoloId={id}
           estagio={LEITURA_COMPLETA}
           estudos={estudos}
-          criterios={listarCriteriosDeExclusao(id)}
-          criteriosDeInclusao={listarCriteriosDeInclusao(id)}
+          criterios={await listarCriteriosDeExclusao(id)}
+          criteriosDeInclusao={await listarCriteriosDeInclusao(id)}
         />
       )}
     </>

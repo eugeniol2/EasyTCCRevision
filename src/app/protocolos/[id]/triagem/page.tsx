@@ -16,12 +16,12 @@ export default async function PaginaDeTriagem({
 }) {
   const { id } = await params;
 
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const criterios = listarCriteriosDeExclusao(id);
+  const criterios = await listarCriteriosDeExclusao(id);
   const concluida =
-    contarPorDecisao(id, TRIAGEM_INICIAL).pendente === 0;
+    (await contarPorDecisao(id, TRIAGEM_INICIAL)).pendente === 0;
 
   return (
     <>
@@ -53,7 +53,7 @@ export default async function PaginaDeTriagem({
         <PainelDeTriagem
           protocoloId={id}
           estagio={TRIAGEM_INICIAL}
-          estudos={listarEstudosParaEstagio(id, TRIAGEM_INICIAL)}
+          estudos={await listarEstudosParaEstagio(id, TRIAGEM_INICIAL)}
           criterios={criterios}
           criteriosDeInclusao={[]}
         />

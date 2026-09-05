@@ -10,10 +10,10 @@ export default async function PaginaDaTabela({
 }) {
   const { id } = await params;
 
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const tabela = montarTabelaDeTrabalhos(id);
+  const tabela = await montarTabelaDeTrabalhos(id);
 
   return (
     <div className="tela-cheia">

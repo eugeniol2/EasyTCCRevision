@@ -17,11 +17,11 @@ export default async function PaginaDeRelatorio({
 }) {
   const { id } = await params;
 
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const prisma = montarPrisma(id);
-  const incluidos = listarEstudosIncluidos(id);
+  const prisma = await montarPrisma(id);
+  const incluidos = await listarEstudosIncluidos(id);
 
   const etapas = [
     { rotulo: "Registros identificados nas buscas", valor: prisma.identificados },
@@ -131,15 +131,15 @@ export default async function PaginaDeRelatorio({
       <BlocoCopiavel
         titulo="Texto da metodologia"
         ajuda="Com as bases, datas e contagens já preenchidas."
-        conteudo={textoDaMetodologia(id)}
+        conteudo={await textoDaMetodologia(id)}
         vazio="Registre ao menos uma busca para gerar o texto."
       />
 
       <TabelaDeTrabalhos
         protocoloId={id}
         tituloDaRevisao={protocolo.titulo}
-        tabela={montarTabelaDeTrabalhos(id)}
-        latex={tabelaEmLatex(id, protocolo.titulo)}
+        tabela={await montarTabelaDeTrabalhos(id)}
+        latex={await tabelaEmLatex(id, protocolo.titulo)}
       />
 
       <section className="cartao" style={{ marginTop: "1.25rem" }}>

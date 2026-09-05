@@ -21,26 +21,25 @@ export interface DecisaoDeTriagem {
  * Quando a fase 1 deixa de incluí-lo, a linha da fase 2 vira órfã: some da
  * contagem, mas reapareceria intacta se o estudo fosse reincluído depois.
  */
-function limparDecisaoDeLeitura(estudoId: string): void {
-  db.delete(triagem)
+async function limparDecisaoDeLeitura(estudoId: string): Promise<void> {
+  await db.delete(triagem)
     .where(
       and(
         eq(triagem.estudoId, estudoId),
         eq(triagem.estagio, LEITURA_COMPLETA),
       ),
-    )
-    .run();
+    );
 }
 
-export function salvarDecisao({
+export async function salvarDecisao({
   estudoId,
   estagio,
   decisao,
   criterioId,
-}: DecisaoDeTriagem): void {
+}: DecisaoDeTriagem): Promise<void> {
   const criterioAplicavel = decisao === "excluido" ? criterioId : null;
 
-  db.insert(triagem)
+  await db.insert(triagem)
     .values({
       id: randomUUID(),
       estudoId,
@@ -55,36 +54,35 @@ export function salvarDecisao({
         criterioId: criterioAplicavel,
         decididoEm: Math.floor(Date.now() / 1000),
       },
-    })
-    .run();
+    });
 
   const saiuDoFunil = estagio === TRIAGEM_INICIAL && decisao !== "incluido";
-  if (saiuDoFunil) limparDecisaoDeLeitura(estudoId);
+  if (saiuDoFunil) await limparDecisaoDeLeitura(estudoId);
 }
 
-export function removerDecisao(
+export async function removerDecisao(
   estudoId: string,
   estagio: EstagioDeTriagem,
-): void {
-  db.delete(triagem)
-    .where(and(eq(triagem.estudoId, estudoId), eq(triagem.estagio, estagio)))
-    .run();
+): Promise<void> {
+  await db.delete(triagem)
+    .where(and(eq(triagem.estudoId, estudoId), eq(triagem.estagio, estagio)));
 
-  if (estagio === TRIAGEM_INICIAL) limparDecisaoDeLeitura(estudoId);
+  if (estagio === TRIAGEM_INICIAL) await limparDecisaoDeLeitura(estudoId);
 }
 
-export function removerTodasAsDecisoes(protocoloId: string): number {
-  const estudosDoProtocolo = db
+export async function removerTodasAsDecisoes(protocoloId: string): Promise<number> {
+  const estudosDoProtocolo = (await db
     .select({ id: estudo.id })
     .from(estudo)
-    .where(eq(estudo.protocoloId, protocoloId))
-    .all()
+    .where(eq(estudo.protocoloId, protocoloId)))
     .map((linha) => linha.id);
 
   if (estudosDoProtocolo.length === 0) return 0;
 
-  return db
+  const removidas = await db
     .delete(triagem)
     .where(inArray(triagem.estudoId, estudosDoProtocolo))
-    .run().changes;
+    .returning();
+
+  return removidas.length;
 }

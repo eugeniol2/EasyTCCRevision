@@ -27,7 +27,7 @@ export async function registrarDecisao({
   decisao,
   criterioId,
 }: DecisaoRecebida): Promise<void> {
-  salvarDecisao({ estudoId, estagio, decisao, criterioId });
+  await salvarDecisao({ estudoId, estagio, decisao, criterioId });
   revalidarTriagem(protocoloId);
 }
 
@@ -36,7 +36,7 @@ export async function desfazerDecisao(
   estudoId: string,
   estagio: EstagioDeTriagem,
 ): Promise<void> {
-  removerDecisao(estudoId, estagio);
+  await removerDecisao(estudoId, estagio);
   revalidarTriagem(protocoloId);
 }
 
@@ -44,7 +44,7 @@ export async function descartarArtigo(
   protocoloId: string,
   estudoId: string,
 ): Promise<void> {
-  descartarEstudo(estudoId);
+  await descartarEstudo(estudoId);
   revalidarTriagem(protocoloId);
 }
 
@@ -54,8 +54,8 @@ export async function alternarAtendimento(
   criterioId: string,
   atendido: boolean,
 ): Promise<void> {
-  if (atendido) marcarAtendimento(estudoId, criterioId);
-  else desmarcarAtendimento(estudoId, criterioId);
+  if (atendido) await marcarAtendimento(estudoId, criterioId);
+  else await desmarcarAtendimento(estudoId, criterioId);
 
   revalidarTriagem(protocoloId);
 }

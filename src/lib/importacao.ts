@@ -27,13 +27,13 @@ export interface BuscaIdentica {
  * sendo importada em partes. Sem detectar isso, cada parte vira uma busca
  * nova e o "identificados" do PRISMA infla a cada importação.
  */
-export function encontrarBuscaIdentica(
+export async function encontrarBuscaIdentica(
   protocoloId: string,
   base: string,
   stringBusca: string,
   executadaEmSegundos: number,
-): BuscaIdentica | null {
-  const encontrada = db
+): Promise<BuscaIdentica | null> {
+  const [encontrada] = await db
     .select()
     .from(busca)
     .where(
@@ -43,16 +43,14 @@ export function encontrarBuscaIdentica(
         eq(busca.stringBusca, stringBusca),
         eq(busca.executadaEm, executadaEmSegundos),
       ),
-    )
-    .get();
+    );
 
   if (!encontrada) return null;
 
-  const vinculos = db
-    .select({ quantidade: sql<number>`count(*)` })
+  const [vinculos] = await db
+    .select({ quantidade: sql<number>`count(*)::int` })
     .from(estudoBusca)
-    .where(eq(estudoBusca.buscaId, encontrada.id))
-    .get();
+    .where(eq(estudoBusca.buscaId, encontrada.id));
 
   return {
     id: encontrada.id,
@@ -95,21 +93,20 @@ function encontrarEquivalenteSalvo(
   );
 }
 
-function listarJaSalvos(protocoloId: string): EstudoJaSalvo[] {
-  return db
+async function listarJaSalvos(protocoloId: string): Promise<EstudoJaSalvo[]> {
+  return await db
     .select({
       id: estudo.id,
       doiNorm: estudo.doiNorm,
       tituloNorm: estudo.tituloNorm,
     })
     .from(estudo)
-    .where(eq(estudo.protocoloId, protocoloId))
-    .all();
+    .where(eq(estudo.protocoloId, protocoloId));
 }
 
-export function importarParaOProtocolo(
+export async function importarParaOProtocolo(
   dados: DadosDaImportacao,
-): ResumoDaImportacao {
+): Promise<ResumoDaImportacao> {
   const arquivoLido = lerArquivo(dados.conteudo);
 
   if (arquivoLido.estudos.length === 0) {
@@ -126,15 +123,15 @@ export function importarParaOProtocolo(
 
   const { unicos, fundidos, suspeitas } = deduplicar(arquivoLido.estudos);
 
-  const jaSalvos = listarJaSalvos(dados.protocoloId);
+  const jaSalvos = await listarJaSalvos(dados.protocoloId);
   const anexando = dados.anexarABusca ?? null;
   const buscaId = anexando ?? randomUUID();
   let importados = 0;
   let jaExistiamNoProtocolo = 0;
 
-  db.transaction((transacao) => {
+  await db.transaction(async (transacao) => {
     if (!anexando) {
-      transacao
+      await transacao
         .insert(busca)
         .values({
           id: buscaId,
@@ -143,8 +140,7 @@ export function importarParaOProtocolo(
           stringBusca: dados.stringBusca,
           executadaEm: dados.executadaEmSegundos,
           totalResultados: arquivoLido.estudos.length,
-        })
-        .run();
+        });
     }
 
     for (const candidato of unicos) {
@@ -152,20 +148,18 @@ export function importarParaOProtocolo(
 
       if (equivalente) {
         jaExistiamNoProtocolo++;
-        transacao
+        await transacao
           .insert(estudoBusca)
           .values({ estudoId: equivalente.id, buscaId })
-          .onConflictDoNothing()
-          .run();
+          .onConflictDoNothing();
         continue;
       }
 
       const estudoId = randomUUID();
-      transacao
+      await transacao
         .insert(estudo)
-        .values({ id: estudoId, protocoloId: dados.protocoloId, ...candidato })
-        .run();
-      transacao.insert(estudoBusca).values({ estudoId, buscaId }).run();
+        .values({ id: estudoId, protocoloId: dados.protocoloId, ...candidato });
+      await transacao.insert(estudoBusca).values({ estudoId, buscaId });
 
       jaSalvos.push({
         id: estudoId,
@@ -176,17 +170,15 @@ export function importarParaOProtocolo(
     }
 
     if (anexando) {
-      const vinculados = transacao
-        .select({ quantidade: sql<number>`count(*)` })
+      const [vinculados] = await transacao
+        .select({ quantidade: sql<number>`count(*)::int` })
         .from(estudoBusca)
-        .where(eq(estudoBusca.buscaId, buscaId))
-        .get();
+        .where(eq(estudoBusca.buscaId, buscaId));
 
-      transacao
+      await transacao
         .update(busca)
         .set({ totalResultados: vinculados?.quantidade ?? 0 })
-        .where(eq(busca.id, buscaId))
-        .run();
+        .where(eq(busca.id, buscaId));
     }
   });
 

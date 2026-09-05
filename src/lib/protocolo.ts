@@ -25,32 +25,30 @@ const PREFIXO_POR_TIPO: Record<TipoDeCriterio, string> = {
   exclusao: "EC",
 };
 
-export function atualizarProtocolo(
+export async function atualizarProtocolo(
   protocoloId: string,
   dados: DadosDoProtocolo,
-): void {
-  db.update(protocolo).set(dados).where(eq(protocolo.id, protocoloId)).run();
+): Promise<void> {
+  await db.update(protocolo).set(dados).where(eq(protocolo.id, protocoloId));
 }
 
-export function listarCriteriosEditaveis(protocoloId: string): CriterioEditavel[] {
+export async function listarCriteriosEditaveis(protocoloId: string): Promise<CriterioEditavel[]> {
   const usoPorCriterio = new Map(
-    db
-      .select({ criterioId: triagem.criterioId, quantidade: sql<number>`count(*)` })
+    (await db
+      .select({ criterioId: triagem.criterioId, quantidade: sql<number>`count(*)::int` })
       .from(triagem)
-      .groupBy(triagem.criterioId)
-      .all()
+      .groupBy(triagem.criterioId))
       .filter((linha): linha is { criterioId: string; quantidade: number } =>
         linha.criterioId !== null,
       )
       .map((linha) => [linha.criterioId, linha.quantidade]),
   );
 
-  return db
+  return (await db
     .select()
     .from(criterio)
     .where(eq(criterio.protocoloId, protocoloId))
-    .orderBy(criterio.ordem)
-    .all()
+    .orderBy(criterio.ordem))
     .map((linha) => ({
       id: linha.id,
       tipo: linha.tipo,
@@ -90,15 +88,14 @@ export interface ResumoDaGravacao {
  * metodologia e no relatório de exclusões, então renumerar reescreveria o
  * passado. Critérios novos recebem o menor número livre do seu tipo.
  */
-export function salvarCriterios(
+export async function salvarCriterios(
   protocoloId: string,
   recebidos: CriterioRecebido[],
-): ResumoDaGravacao {
-  const existentes = db
+): Promise<ResumoDaGravacao> {
+  const existentes = await db
     .select()
     .from(criterio)
-    .where(eq(criterio.protocoloId, protocoloId))
-    .all();
+    .where(eq(criterio.protocoloId, protocoloId));
 
   const codigosEmUso = new Set(existentes.map((linha) => linha.codigo));
   const idsRecebidos = new Set(
@@ -110,26 +107,25 @@ export function salvarCriterios(
 
   const resumo: ResumoDaGravacao = { criados: 0, atualizados: 0, removidos: 0 };
 
-  db.transaction((transacao) => {
+  await db.transaction(async (transacao) => {
     if (paraRemover.length > 0) {
-      transacao
+      await transacao
         .delete(criterio)
         .where(
           and(
             eq(criterio.protocoloId, protocoloId),
             inArray(criterio.id, paraRemover),
           ),
-        )
-        .run();
+        );
       resumo.removidos = paraRemover.length;
     }
 
-    recebidos.forEach((item, ordem) => {
+    for (const [ordem, item] of recebidos.entries()) {
       const descricao = item.descricao.trim();
       if (descricao === "") return;
 
       if (item.id === null) {
-        transacao
+        await transacao
           .insert(criterio)
           .values({
             id: randomUUID(),
@@ -138,19 +134,17 @@ export function salvarCriterios(
             codigo: proximoCodigoDisponivel(item.tipo, codigosEmUso),
             descricao,
             ordem,
-          })
-          .run();
+          });
         resumo.criados++;
-        return;
+        continue;
       }
 
-      transacao
+      await transacao
         .update(criterio)
         .set({ tipo: item.tipo, descricao, ordem })
-        .where(eq(criterio.id, item.id))
-        .run();
+        .where(eq(criterio.id, item.id));
       resumo.atualizados++;
-    });
+    }
   });
 
   return resumo;

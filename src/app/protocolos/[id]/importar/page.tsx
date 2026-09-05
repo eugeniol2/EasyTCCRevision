@@ -8,7 +8,7 @@ export default async function PaginaDeImportacao({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
   return (

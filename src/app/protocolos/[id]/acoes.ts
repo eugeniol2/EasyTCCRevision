@@ -10,11 +10,11 @@ function revalidarProtocolo(protocoloId: string): void {
 }
 
 export async function zerarTriagem(protocoloId: string): Promise<void> {
-  removerTodasAsDecisoes(protocoloId);
+  await removerTodasAsDecisoes(protocoloId);
   revalidarProtocolo(protocoloId);
 }
 
 export async function descartarTudo(protocoloId: string): Promise<void> {
-  descartarTudoDoProtocolo(protocoloId);
+  await descartarTudoDoProtocolo(protocoloId);
   revalidarProtocolo(protocoloId);
 }

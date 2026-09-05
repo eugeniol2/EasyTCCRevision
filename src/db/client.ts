@@ -1,28 +1,36 @@
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { readFileSync } from "node:fs";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
 
-const ARQUIVO_DO_BANCO = process.env.DATABASE_FILE ?? "revisa.db";
+function urlDoBanco(): string {
+  const doAmbiente = process.env.DATABASE_URL;
+  if (doAmbiente) return doAmbiente;
 
-const conexoesPorProcesso = globalThis as unknown as {
-  conexaoSqlite?: Database.Database;
-};
+  // Em scripts locais o .env.local não é carregado automaticamente.
+  const doArquivo = readFileSync(".env.local", "utf8").match(
+    /DATABASE_URL="([^"]+)"/,
+  )?.[1];
 
-function abrirConexao(): Database.Database {
-  const conexao = new Database(ARQUIVO_DO_BANCO);
-  conexao.pragma("journal_mode = WAL");
-  conexao.pragma("foreign_keys = ON");
-  return conexao;
+  if (!doArquivo) throw new Error("DATABASE_URL não configurada");
+  return doArquivo;
 }
 
-const conexao = conexoesPorProcesso.conexaoSqlite ?? abrirConexao();
+const conexoesPorProcesso = globalThis as unknown as {
+  conexaoPostgres?: ReturnType<typeof postgres>;
+};
+
+// O Next em desenvolvimento reavalia módulos a cada alteração; sem o cache
+// global, cada recarga abriria um novo pool contra o Neon.
+const conexao =
+  conexoesPorProcesso.conexaoPostgres ?? postgres(urlDoBanco(), { max: 5 });
 
 if (process.env.NODE_ENV !== "production") {
-  conexoesPorProcesso.conexaoSqlite = conexao;
+  conexoesPorProcesso.conexaoPostgres = conexao;
 }
 
 export const db = drizzle(conexao, { schema });
 
-export function fecharBanco(): void {
-  if (conexao.open) conexao.close();
+export async function fecharBanco(): Promise<void> {
+  await conexao.end();
 }

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { campoExtracao, estudo, extracao, triagem } from "@/db/schema";
-import { alias } from "drizzle-orm/sqlite-core";
+import { alias } from "drizzle-orm/pg-core";
 import { CAMPOS_PADRAO, type TipoDeCampo } from "@/lib/campos";
 import {
   LEITURA_COMPLETA,
@@ -21,13 +21,12 @@ export interface CampoDeExtracao {
   ordem: number;
 }
 
-export function listarCampos(protocoloId: string): CampoDeExtracao[] {
-  return db
+export async function listarCampos(protocoloId: string): Promise<CampoDeExtracao[]> {
+  return (await db
     .select()
     .from(campoExtracao)
     .where(eq(campoExtracao.protocoloId, protocoloId))
-    .orderBy(campoExtracao.ordem)
-    .all()
+    .orderBy(campoExtracao.ordem))
     .map((linha) => ({
       id: linha.id,
       nome: linha.nome,
@@ -37,11 +36,11 @@ export function listarCampos(protocoloId: string): CampoDeExtracao[] {
     }));
 }
 
-export function criarCamposPadrao(protocoloId: string): number {
-  const jaExistem = listarCampos(protocoloId);
+export async function criarCamposPadrao(protocoloId: string): Promise<number> {
+  const jaExistem = await listarCampos(protocoloId);
   if (jaExistem.length > 0) return 0;
 
-  db.insert(campoExtracao)
+  await db.insert(campoExtracao)
     .values(
       CAMPOS_PADRAO.map((campo, ordem) => ({
         id: randomUUID(),
@@ -51,30 +50,33 @@ export function criarCamposPadrao(protocoloId: string): number {
         opcoes: campo.opcoes ?? null,
         ordem,
       })),
-    )
-    .run();
+    );
 
   return CAMPOS_PADRAO.length;
 }
 
-export function adicionarCampo(
+export async function adicionarCampo(
   protocoloId: string,
   nome: string,
   tipo: TipoDeCampo,
   opcoes: string[] | null,
-): string {
-  const proximaOrdem = listarCampos(protocoloId).length;
+): Promise<string> {
+  const proximaOrdem = (await listarCampos(protocoloId)).length;
   const id = randomUUID();
 
-  db.insert(campoExtracao)
-    .values({ id, protocoloId, nome, tipo, opcoes, ordem: proximaOrdem })
-    .run();
+  await db.insert(campoExtracao)
+    .values({ id, protocoloId, nome, tipo, opcoes, ordem: proximaOrdem });
 
   return id;
 }
 
-export function removerCampo(campoId: string): number {
-  return db.delete(campoExtracao).where(eq(campoExtracao.id, campoId)).run().changes;
+export async function removerCampo(campoId: string): Promise<number> {
+  const removidos = await db
+    .delete(campoExtracao)
+    .where(eq(campoExtracao.id, campoId))
+    .returning();
+
+  return removidos.length;
 }
 
 export interface EstudoParaExtracao {
@@ -96,10 +98,10 @@ const decisaoDaFase1 = alias(triagem, "fase1");
  * a fase 2 deixava passar registros órfãos: decisões de leitura tomadas
  * antes de a decisão da fase 1 ser revista para fora do funil.
  */
-export function listarEstudosParaExtracao(
+export async function listarEstudosParaExtracao(
   protocoloId: string,
-): EstudoParaExtracao[] {
-  const incluidos = db
+): Promise<EstudoParaExtracao[]> {
+  const incluidos = await db
     .select({
       id: estudo.id,
       titulo: estudo.titulo,
@@ -127,13 +129,12 @@ export function listarEstudosParaExtracao(
       ),
     )
     .where(eq(estudo.protocoloId, protocoloId))
-    .orderBy(estudo.ano, estudo.criadoEm)
-    .all();
+    .orderBy(estudo.ano, estudo.criadoEm);
 
   if (incluidos.length === 0) return [];
 
   const valoresPorEstudo = new Map<string, Record<string, string>>();
-  const linhas = db
+  const linhas = await db
     .select()
     .from(extracao)
     .where(
@@ -141,8 +142,7 @@ export function listarEstudosParaExtracao(
         extracao.estudoId,
         incluidos.map((linha) => linha.id),
       ),
-    )
-    .all();
+    );
 
   for (const linha of linhas) {
     const doEstudo = valoresPorEstudo.get(linha.estudoId) ?? {};
@@ -162,27 +162,25 @@ export function listarEstudosParaExtracao(
   });
 }
 
-export function salvarValorExtraido(
+export async function salvarValorExtraido(
   estudoId: string,
   campoId: string,
   valor: string,
-): void {
+): Promise<void> {
   const semConteudo = valor.trim() === "";
 
   if (semConteudo) {
-    db.delete(extracao)
-      .where(and(eq(extracao.estudoId, estudoId), eq(extracao.campoId, campoId)))
-      .run();
+    await db.delete(extracao)
+      .where(and(eq(extracao.estudoId, estudoId), eq(extracao.campoId, campoId)));
     return;
   }
 
-  db.insert(extracao)
+  await db.insert(extracao)
     .values({ estudoId, campoId, valor })
     .onConflictDoUpdate({
       target: [extracao.estudoId, extracao.campoId],
       set: { valor },
-    })
-    .run();
+    });
 }
 
 export interface ProgressoDaExtracao {
@@ -191,9 +189,9 @@ export interface ProgressoDaExtracao {
   campos: number;
 }
 
-export function medirProgresso(protocoloId: string): ProgressoDaExtracao {
-  const campos = listarCampos(protocoloId).length;
-  const estudos = listarEstudosParaExtracao(protocoloId);
+export async function medirProgresso(protocoloId: string): Promise<ProgressoDaExtracao> {
+  const campos = (await listarCampos(protocoloId)).length;
+  const estudos = await listarEstudosParaExtracao(protocoloId);
 
   return {
     estudos: estudos.length,
@@ -205,15 +203,14 @@ export function medirProgresso(protocoloId: string): ProgressoDaExtracao {
   };
 }
 
-export function contarValoresPreenchidos(protocoloId: string): number {
-  const idsDeCampos = listarCampos(protocoloId).map((campo) => campo.id);
+export async function contarValoresPreenchidos(protocoloId: string): Promise<number> {
+  const idsDeCampos = (await listarCampos(protocoloId)).map((campo) => campo.id);
   if (idsDeCampos.length === 0) return 0;
 
-  const linha = db
-    .select({ quantidade: sql<number>`count(*)` })
+  const [linha] = await db
+    .select({ quantidade: sql<number>`count(*)::int` })
     .from(extracao)
-    .where(inArray(extracao.campoId, idsDeCampos))
-    .get();
+    .where(inArray(extracao.campoId, idsDeCampos));
 
-  return linha?.quantidade ?? 0;
+  return Number(linha?.quantidade ?? 0);
 }

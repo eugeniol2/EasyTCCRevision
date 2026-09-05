@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { busca, estudo } from "@/db/schema";
 
-export function descartarEstudo(estudoId: string): number {
-  return db.delete(estudo).where(eq(estudo.id, estudoId)).run().changes;
+export async function descartarEstudo(estudoId: string): Promise<number> {
+  const removidos = await db.delete(estudo).where(eq(estudo.id, estudoId)).returning();
+  return removidos.length;
 }
 
 export interface ResumoDoDescarte {
@@ -11,18 +12,21 @@ export interface ResumoDoDescarte {
   buscasRemovidas: number;
 }
 
-export function descartarTudoDoProtocolo(protocoloId: string): ResumoDoDescarte {
-  return db.transaction((transacao) => {
-    const estudosRemovidos = transacao
+export async function descartarTudoDoProtocolo(protocoloId: string): Promise<ResumoDoDescarte> {
+  return await db.transaction(async (transacao) => {
+    const estudosRemovidos = await transacao
       .delete(estudo)
       .where(eq(estudo.protocoloId, protocoloId))
-      .run().changes;
+      .returning();
 
-    const buscasRemovidas = transacao
+    const buscasRemovidas = await transacao
       .delete(busca)
       .where(eq(busca.protocoloId, protocoloId))
-      .run().changes;
+      .returning();
 
-    return { estudosRemovidos, buscasRemovidas };
+    return {
+      estudosRemovidos: estudosRemovidos.length,
+      buscasRemovidas: buscasRemovidas.length,
+    };
   });
 }

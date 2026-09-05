@@ -1,7 +1,18 @@
+import { auth } from "@/auth";
 import { contarEstudos, listarProtocolos } from "@/lib/consultas";
+import SairDaConta from "./SairDaConta";
 
 export default async function PaginaInicial() {
-  const protocolos = listarProtocolos();
+  const sessao = await auth();
+  const protocolos = await listarProtocolos();
+  const estudosPorProtocolo = new Map(
+    await Promise.all(
+      protocolos.map(
+        async (protocolo) =>
+          [protocolo.id, await contarEstudos(protocolo.id)] as const,
+      ),
+    ),
+  );
 
   return (
     <>
@@ -10,6 +21,7 @@ export default async function PaginaInicial() {
           <h1>Revisa</h1>
           <p className="subtitulo">Suas revisões sistemáticas</p>
         </div>
+        {sessao?.user?.email && <SairDaConta email={sessao.user.email} />}
       </header>
 
       {protocolos.length === 0 ? (
@@ -29,7 +41,7 @@ export default async function PaginaInicial() {
               <p className="subtitulo">{protocolo.questaoPesquisa}</p>
               <div className="contadores">
                 <span>
-                  Estudos <strong>{contarEstudos(protocolo.id)}</strong>
+                  Estudos <strong>{estudosPorProtocolo.get(protocolo.id)}</strong>
                 </span>
                 <span>
                   Recorte{" "}

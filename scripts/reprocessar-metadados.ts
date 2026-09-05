@@ -5,7 +5,7 @@ import { parseAutores } from "../src/lib/bibtex/autores";
 import { parseBibtex } from "../src/lib/bibtex/parser";
 import { extrairMes, extrairPalavrasChave } from "../src/lib/publicacao";
 
-const registros = db
+const registros = await db
   .select({
     id: estudo.id,
     autores: estudo.autores,
@@ -13,8 +13,7 @@ const registros = db
     palavrasChave: estudo.palavrasChave,
     bibtexRaw: estudo.bibtexRaw,
   })
-  .from(estudo)
-  .all();
+  .from(estudo);
 
 let atualizados = 0;
 
@@ -37,10 +36,9 @@ for (const registro of registros) {
     JSON.stringify(autores) === JSON.stringify(registro.autores);
   if (nadaMudou) continue;
 
-  db.update(estudo)
+  await db.update(estudo)
     .set({ mes, palavrasChave, autores })
-    .where(eq(estudo.id, registro.id))
-    .run();
+    .where(eq(estudo.id, registro.id));
   atualizados++;
 }
 

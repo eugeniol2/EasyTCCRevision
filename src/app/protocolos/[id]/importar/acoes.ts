@@ -34,7 +34,7 @@ export async function importarBibtex(
 
   const executadaEmSegundos = paraSegundosUnix(executadaEm);
   const modo = textoDoCampo(formData, "modo");
-  const identica = encontrarBuscaIdentica(
+  const identica = await encontrarBuscaIdentica(
     protocoloId,
     base,
     stringBusca,
@@ -54,7 +54,7 @@ export async function importarBibtex(
     };
   }
 
-  const resumo = importarParaOProtocolo({
+  const resumo = await importarParaOProtocolo({
     protocoloId,
     base,
     stringBusca,

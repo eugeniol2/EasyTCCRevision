@@ -39,15 +39,15 @@ export interface Prisma {
   buscas: BuscaExecutada[];
 }
 
-function exclusoesPorCriterio(
+async function exclusoesPorCriterio(
   protocoloId: string,
   estagio: typeof TRIAGEM_INICIAL | typeof LEITURA_COMPLETA,
-): ExclusaoPorCriterio[] {
-  return db
+): Promise<ExclusaoPorCriterio[]> {
+  return await db
     .select({
       codigo: criterio.codigo,
       descricao: criterio.descricao,
-      quantidade: sql<number>`count(*)`,
+      quantidade: sql<number>`count(*)::int`,
     })
     .from(triagem)
     .innerJoin(estudo, eq(estudo.id, triagem.estudoId))
@@ -60,27 +60,24 @@ function exclusoesPorCriterio(
       ),
     )
     .groupBy(criterio.id)
-    .orderBy(criterio.ordem)
-    .all();
+    .orderBy(criterio.ordem);
 }
 
-export function montarPrisma(protocoloId: string): Prisma {
-  const registrosDeBusca = db
+export async function montarPrisma(protocoloId: string): Promise<Prisma> {
+  const registrosDeBusca = await db
     .select()
     .from(busca)
     .where(eq(busca.protocoloId, protocoloId))
-    .orderBy(busca.executadaEm)
-    .all();
+    .orderBy(busca.executadaEm);
 
-  const vinculos = db
-    .select({ quantidade: sql<number>`count(*)` })
+  const [vinculos] = await db
+    .select({ quantidade: sql<number>`count(*)::int` })
     .from(estudoBusca)
     .innerJoin(busca, eq(busca.id, estudoBusca.buscaId))
-    .where(eq(busca.protocoloId, protocoloId))
-    .get();
+    .where(eq(busca.protocoloId, protocoloId));
 
-  const naTriagem = contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
-  const naLeitura = contarPorDecisao(protocoloId, LEITURA_COMPLETA);
+  const naTriagem = await contarPorDecisao(protocoloId, TRIAGEM_INICIAL);
+  const naLeitura = await contarPorDecisao(protocoloId, LEITURA_COMPLETA);
 
   const identificados = registrosDeBusca.reduce(
     (total, item) => total + (item.totalResultados ?? 0),
@@ -93,12 +90,12 @@ export function montarPrisma(protocoloId: string): Prisma {
     duplicatasRemovidas: Math.max(identificados, registrosVinculados) - naTriagem.total,
     triados: naTriagem.total,
     excluidosNaTriagem: naTriagem.excluido,
-    excluidosPorCriterioNaTriagem: exclusoesPorCriterio(protocoloId, TRIAGEM_INICIAL),
+    excluidosPorCriterioNaTriagem: await exclusoesPorCriterio(protocoloId, TRIAGEM_INICIAL),
     emDuvidaNaTriagem: naTriagem.duvida,
     pendentesNaTriagem: naTriagem.pendente,
     avaliadosPorTextoCompleto: naLeitura.total,
     excluidosNaLeitura: naLeitura.excluido,
-    excluidosPorCriterioNaLeitura: exclusoesPorCriterio(protocoloId, LEITURA_COMPLETA),
+    excluidosPorCriterioNaLeitura: await exclusoesPorCriterio(protocoloId, LEITURA_COMPLETA),
     pendentesNaLeitura: naLeitura.pendente,
     incluidos: naLeitura.incluido,
     buscas: registrosDeBusca.map((item) => ({
@@ -139,9 +136,9 @@ export interface TabelaDeTrabalhos {
   linhas: LinhaDaTabela[];
 }
 
-export function montarTabelaDeTrabalhos(protocoloId: string): TabelaDeTrabalhos {
-  const campos = listarCampos(protocoloId);
-  const estudos = listarEstudosParaExtracao(protocoloId);
+export async function montarTabelaDeTrabalhos(protocoloId: string): Promise<TabelaDeTrabalhos> {
+  const campos = await listarCampos(protocoloId);
+  const estudos = await listarEstudosParaExtracao(protocoloId);
 
   return {
     colunas: campos.map((campo) => campo.nome),
@@ -163,8 +160,8 @@ export interface EstudoIncluido {
   url: string | null;
 }
 
-export function listarEstudosIncluidos(protocoloId: string): EstudoIncluido[] {
-  return listarEstudosParaExtracao(protocoloId).map((item) => ({
+export async function listarEstudosIncluidos(protocoloId: string): Promise<EstudoIncluido[]> {
+  return (await listarEstudosParaExtracao(protocoloId)).map((item) => ({
     id: item.id,
     titulo: item.titulo,
     autores: formatarAutores(item.autores, 20),
@@ -175,9 +172,9 @@ export function listarEstudosIncluidos(protocoloId: string): EstudoIncluido[] {
   }));
 }
 
-export function tabelaEmLatex(protocoloId: string, tituloDaRevisao: string): string {
-  const campos = listarCampos(protocoloId);
-  const estudos = listarEstudosParaExtracao(protocoloId);
+export async function tabelaEmLatex(protocoloId: string, tituloDaRevisao: string): Promise<string> {
+  const campos = await listarCampos(protocoloId);
+  const estudos = await listarEstudosParaExtracao(protocoloId);
 
   if (estudos.length === 0) return "";
 
@@ -224,11 +221,11 @@ function listarExclusoes(exclusoes: ExclusaoPorCriterio[]): string {
     .join(", ")})`;
 }
 
-export function textoDaMetodologia(protocoloId: string): string {
-  const protocolo = buscarProtocolo(protocoloId);
+export async function textoDaMetodologia(protocoloId: string): Promise<string> {
+  const protocolo = await buscarProtocolo(protocoloId);
   if (!protocolo) return "";
 
-  const prisma = montarPrisma(protocoloId);
+  const prisma = await montarPrisma(protocoloId);
   const bases = [...new Set(prisma.buscas.map((item) => item.base))];
   const datas = prisma.buscas.map((item) => formatarData(item.executadaEm));
 

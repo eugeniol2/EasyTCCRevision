@@ -2,14 +2,15 @@ import { sql } from "drizzle-orm";
 import {
   index,
   integer,
+  jsonb,
+  pgTable,
   primaryKey,
-  sqliteTable,
   text,
   uniqueIndex,
-} from "drizzle-orm/sqlite-core";
+} from "drizzle-orm/pg-core";
 
-const AGORA = sql`(unixepoch())`;
-const LISTA_VAZIA = sql`'[]'`;
+const AGORA = sql`extract(epoch from now())::int`;
+const LISTA_VAZIA = sql`'[]'::jsonb`;
 
 export interface Autor {
   given?: string;
@@ -17,8 +18,31 @@ export interface Autor {
   literal?: string;
 }
 
-export const protocolo = sqliteTable("protocolo", {
+export const usuario = pgTable(
+  "usuario",
+  {
+    id: text("id").primaryKey(),
+    // 'sub' do Google: identificador estável, ao contrário do e-mail, que a
+    // instituição pode reatribuir.
+    googleSub: text("google_sub").notNull(),
+    email: text("email").notNull(),
+    nome: text("nome"),
+    imagem: text("imagem"),
+    criadoEm: integer("criado_em").notNull().default(AGORA),
+    ultimoAcesso: integer("ultimo_acesso").notNull().default(AGORA),
+  },
+  (tabela) => ({
+    subUnico: uniqueIndex("usuario_google_sub_unq").on(tabela.googleSub),
+    porEmail: index("usuario_email_idx").on(tabela.email),
+  }),
+);
+
+export const protocolo = pgTable("protocolo", {
   id: text("id").primaryKey(),
+  // Nulo apenas nos protocolos criados antes da autenticação existir.
+  usuarioId: text("usuario_id").references(() => usuario.id, {
+    onDelete: "cascade",
+  }),
   titulo: text("titulo").notNull(),
   questaoPesquisa: text("questao_pesquisa"),
   anoInicio: integer("ano_inicio"),
@@ -26,7 +50,7 @@ export const protocolo = sqliteTable("protocolo", {
   criadoEm: integer("criado_em").notNull().default(AGORA),
 });
 
-export const criterio = sqliteTable(
+export const criterio = pgTable(
   "criterio",
   {
     id: text("id").primaryKey(),
@@ -46,7 +70,7 @@ export const criterio = sqliteTable(
   }),
 );
 
-export const busca = sqliteTable(
+export const busca = pgTable(
   "busca",
   {
     id: text("id").primaryKey(),
@@ -58,13 +82,16 @@ export const busca = sqliteTable(
     executadaEm: integer("executada_em").notNull(),
     totalResultados: integer("total_resultados"),
     notas: text("notas"),
+    // Duas buscas podem ter a mesma data de execução; sem um desempate a
+    // ordenação da listagem fica indefinida.
+    criadoEm: integer("criado_em").notNull().default(AGORA),
   },
   (tabela) => ({
     porProtocolo: index("busca_protocolo_idx").on(tabela.protocoloId),
   }),
 );
 
-export const estudo = sqliteTable(
+export const estudo = pgTable(
   "estudo",
   {
     id: text("id").primaryKey(),
@@ -74,14 +101,14 @@ export const estudo = sqliteTable(
 
     titulo: text("titulo").notNull(),
     tituloNorm: text("titulo_norm").notNull(),
-    autores: text("autores", { mode: "json" })
+    autores: jsonb("autores")
       .$type<Autor[]>()
       .notNull()
       .default(LISTA_VAZIA),
     ano: integer("ano"),
     mes: integer("mes"),
     veiculo: text("veiculo"),
-    palavrasChave: text("palavras_chave", { mode: "json" })
+    palavrasChave: jsonb("palavras_chave")
       .$type<string[]>()
       .notNull()
       .default(LISTA_VAZIA),
@@ -108,7 +135,7 @@ export const estudo = sqliteTable(
   }),
 );
 
-export const estudoBusca = sqliteTable(
+export const estudoBusca = pgTable(
   "estudo_busca",
   {
     estudoId: text("estudo_id")
@@ -123,7 +150,7 @@ export const estudoBusca = sqliteTable(
   }),
 );
 
-export const triagem = sqliteTable(
+export const triagem = pgTable(
   "triagem",
   {
     id: text("id").primaryKey(),
@@ -151,7 +178,7 @@ export const triagem = sqliteTable(
   }),
 );
 
-export const atendimento = sqliteTable(
+export const atendimento = pgTable(
   "atendimento",
   {
     estudoId: text("estudo_id")
@@ -166,7 +193,7 @@ export const atendimento = sqliteTable(
   }),
 );
 
-export const campoExtracao = sqliteTable(
+export const campoExtracao = pgTable(
   "campo_extracao",
   {
     id: text("id").primaryKey(),
@@ -177,7 +204,7 @@ export const campoExtracao = sqliteTable(
     tipo: text("tipo", { enum: ["texto", "booleano", "numero", "opcoes"] })
       .notNull()
       .default("texto"),
-    opcoes: text("opcoes", { mode: "json" }).$type<string[]>(),
+    opcoes: jsonb("opcoes").$type<string[]>(),
     ordem: integer("ordem").notNull().default(0),
   },
   (tabela) => ({
@@ -185,7 +212,7 @@ export const campoExtracao = sqliteTable(
   }),
 );
 
-export const extracao = sqliteTable(
+export const extracao = pgTable(
   "extracao",
   {
     estudoId: text("estudo_id")

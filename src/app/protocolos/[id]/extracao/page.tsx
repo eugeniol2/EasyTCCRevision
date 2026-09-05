@@ -14,12 +14,12 @@ export default async function PaginaDeExtracao({
 }) {
   const { id } = await params;
 
-  const protocolo = buscarProtocolo(id);
+  const protocolo = await buscarProtocolo(id);
   if (!protocolo) notFound();
 
-  const estudos = listarEstudosParaExtracao(id);
-  const naLeitura = contarPorDecisao(id, LEITURA_COMPLETA);
-  const progresso = medirProgresso(id);
+  const estudos = await listarEstudosParaExtracao(id);
+  const naLeitura = await contarPorDecisao(id, LEITURA_COMPLETA);
+  const progresso = await medirProgresso(id);
   const concluida = progresso.estudos > 0 && progresso.completos === progresso.estudos;
 
   return (
@@ -58,7 +58,7 @@ export default async function PaginaDeExtracao({
         <PainelDeExtracao
           protocoloId={id}
           estudos={estudos}
-          campos={listarCampos(id)}
+          campos={await listarCampos(id)}
         />
       )}
     </>
