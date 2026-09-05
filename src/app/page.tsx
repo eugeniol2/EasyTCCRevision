@@ -1,10 +1,12 @@
 import { auth } from "@/auth";
+import { usuarioAtual } from "@/lib/autorizacao";
 import { contarEstudos, listarProtocolos } from "@/lib/consultas";
+import NovaRevisao from "./NovaRevisao";
 import SairDaConta from "./SairDaConta";
 
 export default async function PaginaInicial() {
   const sessao = await auth();
-  const protocolos = await listarProtocolos();
+  const protocolos = await listarProtocolos(await usuarioAtual());
   const estudosPorProtocolo = new Map(
     await Promise.all(
       protocolos.map(
@@ -26,10 +28,8 @@ export default async function PaginaInicial() {
 
       {protocolos.length === 0 ? (
         <div className="cartao vazio">
-          <p>Nenhum protocolo ainda.</p>
-          <p>
-            Rode <code>npx tsx src/db/seed.ts</code> para criar um de exemplo.
-          </p>
+          <p>Nenhuma revisão ainda.</p>
+          <p>Comece pela pergunta que você quer responder.</p>
         </div>
       ) : (
         <ul className="lista-limpa">
@@ -54,6 +54,8 @@ export default async function PaginaInicial() {
           ))}
         </ul>
       )}
+
+      <NovaRevisao comecarAberto={protocolos.length === 0} />
     </>
   );
 }

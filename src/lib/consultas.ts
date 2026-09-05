@@ -49,8 +49,12 @@ export async function buscarProtocolo(protocoloId: string) {
   return encontrado;
 }
 
-export async function listarProtocolos() {
-  return await db.select().from(protocolo).orderBy(protocolo.criadoEm);
+export async function listarProtocolos(usuarioId: string) {
+  return await db
+    .select()
+    .from(protocolo)
+    .where(eq(protocolo.usuarioId, usuarioId))
+    .orderBy(protocolo.criadoEm);
 }
 
 async function listarCriteriosDoTipo(

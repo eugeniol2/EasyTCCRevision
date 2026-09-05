@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { buscarProtocolo } from "@/lib/consultas";
+import { protocoloDaPagina } from "@/lib/autorizacao";
 import {
   listarEstudosIncluidos,
   montarPrisma,
@@ -17,8 +16,7 @@ export default async function PaginaDeRelatorio({
 }) {
   const { id } = await params;
 
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   const prisma = await montarPrisma(id);
   const incluidos = await listarEstudosIncluidos(id);

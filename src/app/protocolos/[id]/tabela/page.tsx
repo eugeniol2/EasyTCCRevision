@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { buscarProtocolo } from "@/lib/consultas";
+import { protocoloDaPagina } from "@/lib/autorizacao";
 import { montarTabelaDeTrabalhos } from "@/lib/relatorio";
 import TabelaExploravel from "./TabelaExploravel";
 
@@ -10,8 +9,7 @@ export default async function PaginaDaTabela({
 }) {
   const { id } = await params;
 
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   const tabela = await montarTabelaDeTrabalhos(id);
 

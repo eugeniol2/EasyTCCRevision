@@ -1,50 +1,35 @@
-import { randomUUID } from "node:crypto";
+import { eq } from "drizzle-orm";
+import { criarProtocolo } from "../lib/protocolo";
 import { db, fecharBanco } from "./client";
-import { criterio, protocolo } from "./schema";
+import { usuario } from "./schema";
 
-const CRITERIOS_INICIAIS = [
-  { tipo: "inclusao" as const, codigo: "IC1", descricao: "Estudo primário sobre o tema da questão de pesquisa" },
-  { tipo: "inclusao" as const, codigo: "IC2", descricao: "Texto completo disponível" },
-  { tipo: "exclusao" as const, codigo: "EC1", descricao: "Não responde à questão de pesquisa" },
-  { tipo: "exclusao" as const, codigo: "EC2", descricao: "Fora do recorte temporal" },
-  { tipo: "exclusao" as const, codigo: "EC3", descricao: "Não é estudo primário (editorial, resumo, pôster)" },
-  { tipo: "exclusao" as const, codigo: "EC4", descricao: "Idioma fora do definido no protocolo" },
-  { tipo: "exclusao" as const, codigo: "EC5", descricao: "Duplicata de outro estudo já incluído" },
-];
+// Protocolo sem dono fica invisível para todo mundo, então o seed precisa
+// saber de quem é. A conta tem que existir: ela nasce no primeiro login.
+const email = process.argv[2];
 
-async function criarProtocoloDeExemplo(): Promise<string> {
-  const id = randomUUID();
-
-  await db.insert(protocolo)
-    .values({
-      id,
-      titulo: "Minha revisão sistemática",
-      questaoPesquisa: "Qual a pergunta que esta revisão pretende responder?",
-      anoInicio: new Date().getFullYear() - 5,
-      anoFim: new Date().getFullYear(),
-    });
-
-  await db.insert(criterio)
-    .values(
-      CRITERIOS_INICIAIS.map((definicao, ordem) => ({
-        id: randomUUID(),
-        protocoloId: id,
-        ordem,
-        ...definicao,
-      })),
-    );
-
-  return id;
+if (!email) {
+  console.error("Uso: npx tsx src/db/seed.ts <email da conta>");
+  process.exit(1);
 }
 
-const protocolosExistentes = await db.select().from(protocolo);
+const [dono] = await db
+  .select()
+  .from(usuario)
+  .where(eq(usuario.email, email));
 
-if (protocolosExistentes.length > 0) {
-  console.log(`Já existem ${protocolosExistentes.length} protocolo(s). Nada a fazer.`);
-} else {
-  const id = await criarProtocoloDeExemplo();
-  console.log(`Protocolo criado: ${id}`);
-  console.log(`${CRITERIOS_INICIAIS.length} critérios cadastrados.`);
+if (!dono) {
+  console.error(`Nenhuma conta com o e-mail ${email}. Entre no sistema uma vez para criá-la.`);
+  await fecharBanco();
+  process.exit(1);
 }
 
+const anoAtual = new Date().getFullYear();
+const id = await criarProtocolo(dono.id, {
+  titulo: "Minha revisão sistemática",
+  questaoPesquisa: "Qual a pergunta que esta revisão pretende responder?",
+  anoInicio: anoAtual - 5,
+  anoFim: anoAtual,
+});
+
+console.log(`Protocolo criado para ${email}: ${id}`);
 await fecharBanco();

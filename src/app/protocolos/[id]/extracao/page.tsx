@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
-import { buscarProtocolo, contarPorDecisao, LEITURA_COMPLETA } from "@/lib/consultas";
+import { protocoloDaPagina } from "@/lib/autorizacao";
+import { contarPorDecisao, LEITURA_COMPLETA } from "@/lib/consultas";
 import {
   listarCampos,
   listarEstudosParaExtracao,
@@ -14,8 +14,7 @@ export default async function PaginaDeExtracao({
 }) {
   const { id } = await params;
 
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   const estudos = await listarEstudosParaExtracao(id);
   const naLeitura = await contarPorDecisao(id, LEITURA_COMPLETA);

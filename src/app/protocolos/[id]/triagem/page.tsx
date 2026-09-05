@@ -1,6 +1,5 @@
-import { notFound } from "next/navigation";
+import { protocoloDaPagina } from "@/lib/autorizacao";
 import {
-  buscarProtocolo,
   contarPorDecisao,
   listarCriteriosDeExclusao,
   listarEstudosParaEstagio,
@@ -16,8 +15,7 @@ export default async function PaginaDeTriagem({
 }) {
   const { id } = await params;
 
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   const criterios = await listarCriteriosDeExclusao(id);
   const concluida =

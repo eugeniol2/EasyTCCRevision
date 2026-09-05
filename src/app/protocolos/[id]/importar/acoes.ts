@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirProtocolo } from "@/lib/autorizacao";
 import { encontrarBuscaIdentica, importarParaOProtocolo } from "@/lib/importacao";
 import {
   RESULTADO_INICIAL,
@@ -31,6 +32,8 @@ export async function importarBibtex(
   if (!stringBusca) return resultadoComErro("Informe a string de busca usada.");
   if (!executadaEm) return resultadoComErro("Informe a data em que a busca foi executada.");
   if (!conteudo) return resultadoComErro("Escolha o arquivo exportado ou cole o conteúdo.");
+
+  await exigirProtocolo(protocoloId);
 
   const executadaEmSegundos = paraSegundosUnix(executadaEm);
   const modo = textoDoCampo(formData, "modo");

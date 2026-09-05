@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { buscarProtocolo } from "@/lib/consultas";
+import { protocoloDaPagina } from "@/lib/autorizacao";
 import { listarCriteriosEditaveis } from "@/lib/protocolo";
 import EditorDoProtocolo from "./EditorDoProtocolo";
 
@@ -10,8 +9,7 @@ export default async function PaginaDoProtocoloEditavel({
 }) {
   const { id } = await params;
 
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   return (
     <>

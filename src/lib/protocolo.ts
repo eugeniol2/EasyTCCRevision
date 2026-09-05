@@ -25,6 +25,42 @@ const PREFIXO_POR_TIPO: Record<TipoDeCriterio, string> = {
   exclusao: "EC",
 };
 
+/**
+ * Uma revisão nasce com os critérios que quase toda revisão sistemática usa.
+ * São um ponto de partida para editar, não uma regra: quem cria ajusta os
+ * textos e apaga o que não servir na tela do protocolo.
+ */
+const CRITERIOS_INICIAIS: Omit<CriterioEditavel, "id" | "usadoEmExclusoes">[] = [
+  { tipo: "inclusao", codigo: "IC1", descricao: "Estudo primário sobre o tema da questão de pesquisa" },
+  { tipo: "inclusao", codigo: "IC2", descricao: "Texto completo disponível" },
+  { tipo: "exclusao", codigo: "EC1", descricao: "Não responde à questão de pesquisa" },
+  { tipo: "exclusao", codigo: "EC2", descricao: "Fora do recorte temporal" },
+  { tipo: "exclusao", codigo: "EC3", descricao: "Não é estudo primário (editorial, resumo, pôster)" },
+  { tipo: "exclusao", codigo: "EC4", descricao: "Idioma fora do definido no protocolo" },
+  { tipo: "exclusao", codigo: "EC5", descricao: "Duplicata de outro estudo já incluído" },
+];
+
+export async function criarProtocolo(
+  usuarioId: string,
+  dados: DadosDoProtocolo,
+): Promise<string> {
+  const id = randomUUID();
+
+  await db.transaction(async (transacao) => {
+    await transacao.insert(protocolo).values({ id, usuarioId, ...dados });
+    await transacao.insert(criterio).values(
+      CRITERIOS_INICIAIS.map((definicao, ordem) => ({
+        id: randomUUID(),
+        protocoloId: id,
+        ordem,
+        ...definicao,
+      })),
+    );
+  });
+
+  return id;
+}
+
 export async function atualizarProtocolo(
   protocoloId: string,
   dados: DadosDoProtocolo,
@@ -139,10 +175,17 @@ export async function salvarCriterios(
         continue;
       }
 
+      // O protocolo entra no filtro porque o id do critério chega do
+      // formulário: sem ele, um id de outra revisão seria reescrito aqui.
       await transacao
         .update(criterio)
         .set({ tipo: item.tipo, descricao, ordem })
-        .where(eq(criterio.id, item.id));
+        .where(
+          and(
+            eq(criterio.id, item.id),
+            eq(criterio.protocoloId, protocoloId),
+          ),
+        );
       resumo.atualizados++;
     }
   });

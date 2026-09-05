@@ -39,7 +39,9 @@ export const usuario = pgTable(
 
 export const protocolo = pgTable("protocolo", {
   id: text("id").primaryKey(),
-  // Nulo apenas nos protocolos criados antes da autenticação existir.
+  // A coluna aceita nulo por causa dos protocolos anteriores à autenticação,
+  // já migrados. Um protocolo sem dono é invisível para todo mundo, então a
+  // ausência de valor falha fechada.
   usuarioId: text("usuario_id").references(() => usuario.id, {
     onDelete: "cascade",
   }),

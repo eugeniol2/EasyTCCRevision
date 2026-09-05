@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { buscarProtocolo } from "@/lib/consultas";
+import { protocoloDaPagina } from "@/lib/autorizacao";
 import FormularioDeImportacao from "./FormularioDeImportacao";
 
 export default async function PaginaDeImportacao({
@@ -8,8 +7,7 @@ export default async function PaginaDeImportacao({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   return (
     <>

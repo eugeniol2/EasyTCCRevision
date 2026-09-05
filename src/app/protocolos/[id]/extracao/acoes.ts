@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirCampo, exigirEstudo, exigirProtocolo } from "@/lib/autorizacao";
 import {
   adicionarCampo,
   criarCamposPadrao,
@@ -15,6 +16,8 @@ function revalidarExtracao(protocoloId: string): void {
 }
 
 export async function usarCamposPadrao(protocoloId: string): Promise<void> {
+  await exigirProtocolo(protocoloId);
+
   await criarCamposPadrao(protocoloId);
   revalidarExtracao(protocoloId);
 }
@@ -28,6 +31,8 @@ export async function criarCampo(
   const nomeLimpo = nome.trim();
   if (nomeLimpo === "") return;
 
+  await exigirProtocolo(protocoloId);
+
   await adicionarCampo(protocoloId, nomeLimpo, tipo, opcoes);
   revalidarExtracao(protocoloId);
 }
@@ -36,6 +41,8 @@ export async function excluirCampo(
   protocoloId: string,
   campoId: string,
 ): Promise<void> {
+  await exigirCampo(protocoloId, campoId);
+
   await removerCampo(campoId);
   revalidarExtracao(protocoloId);
 }
@@ -46,6 +53,11 @@ export async function salvarValor(
   campoId: string,
   valor: string,
 ): Promise<void> {
+  await Promise.all([
+    exigirEstudo(protocoloId, estudoId),
+    exigirCampo(protocoloId, campoId),
+  ]);
+
   await salvarValorExtraido(estudoId, campoId, valor);
   revalidatePath(`/protocolos/${protocoloId}`);
 }

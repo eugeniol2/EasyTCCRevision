@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { sql as sqlBruto } from "drizzle-orm";
+import { eq, sql as sqlBruto } from "drizzle-orm";
 
 const URL_DE_TESTE = readFileSync(".env.local", "utf8").match(
   /DATABASE_URL_TESTE="([^"]+)"/,
@@ -45,7 +45,8 @@ const { db, fecharBanco } = await import("../src/db/client");
 // tabelas substitui o "apagar o arquivo" que o SQLite permitia.
 await db.execute(
   sqlBruto`truncate table extracao, atendimento, estudo_busca, triagem,
-    campo_extracao, estudo, busca, criterio, protocolo restart identity cascade`,
+    campo_extracao, estudo, busca, criterio, protocolo, usuario
+    restart identity cascade`,
 );
 const { criterio, estudoBusca, protocolo } = await import("../src/db/schema");
 const {
@@ -785,6 +786,143 @@ checar(
   "data diferente cria busca nova",
   (await db.select().from(busca)).filter((b) => b.protocoloId === protocoloDaBusca).length,
   2,
+);
+
+console.log("\nIsolamento entre contas");
+
+const { campoExtracao, usuario } = await import("../src/db/schema");
+const { listarProtocolos } = await import("../src/lib/consultas");
+const {
+  campoEDoProtocolo,
+  criterioEDoProtocolo,
+  estudoEDoProtocolo,
+  protocoloEDoUsuario,
+} = await import("../src/lib/pertencimento");
+
+const ana = randomUUID();
+const bruno = randomUUID();
+await db.insert(usuario).values([
+  { id: ana, googleSub: "sub-ana", email: "ana@ufrpe.br", nome: "Ana" },
+  { id: bruno, googleSub: "sub-bruno", email: "bruno@ufrpe.br", nome: "Bruno" },
+]);
+
+const revisaoDaAna = randomUUID();
+const revisaoDoBruno = randomUUID();
+const revisaoSemDono = randomUUID();
+await db.insert(protocolo).values([
+  { id: revisaoDaAna, usuarioId: ana, titulo: "Revisão da Ana" },
+  { id: revisaoDoBruno, usuarioId: bruno, titulo: "Revisão do Bruno" },
+  { id: revisaoSemDono, titulo: "Revisão órfã" },
+]);
+
+const estudoDaAna = randomUUID();
+const criterioDaAna = randomUUID();
+const campoDaAna = randomUUID();
+await db.insert(estudo).values({
+  id: estudoDaAna,
+  protocoloId: revisaoDaAna,
+  titulo: "Artigo da Ana",
+  tituloNorm: "artigo da ana",
+});
+await db.insert(criterio).values({
+  id: criterioDaAna,
+  protocoloId: revisaoDaAna,
+  tipo: "exclusao",
+  codigo: "EC1",
+  descricao: "Fora do escopo",
+  ordem: 0,
+});
+await db.insert(campoExtracao).values({
+  id: campoDaAna,
+  protocoloId: revisaoDaAna,
+  nome: "Objetivo",
+  tipo: "texto",
+  ordem: 0,
+});
+
+checar("dono acessa o proprio protocolo", await protocoloEDoUsuario(revisaoDaAna, ana), true);
+checar("estranho nao acessa o protocolo alheio", await protocoloEDoUsuario(revisaoDaAna, bruno), false);
+checar("protocolo sem dono nao e de ninguem", await protocoloEDoUsuario(revisaoSemDono, ana), false);
+
+checar(
+  "a listagem mostra so o protocolo da conta",
+  (await listarProtocolos(ana)).map((p) => p.titulo),
+  ["Revisão da Ana"],
+);
+checar(
+  "a listagem do outro nao vaza nem o orfao",
+  (await listarProtocolos(bruno)).map((p) => p.titulo),
+  ["Revisão do Bruno"],
+);
+
+checar("dono alcanca o proprio estudo", await estudoEDoProtocolo(revisaoDaAna, ana, estudoDaAna), true);
+checar(
+  "estranho nao alcanca o estudo pelo protocolo certo",
+  await estudoEDoProtocolo(revisaoDaAna, bruno, estudoDaAna),
+  false,
+);
+checar(
+  "estudo de outra revisao nao passa pelo protocolo proprio",
+  await estudoEDoProtocolo(revisaoDoBruno, bruno, estudoDaAna),
+  false,
+);
+
+checar("dono alcanca o proprio campo", await campoEDoProtocolo(revisaoDaAna, ana, campoDaAna), true);
+checar("estranho nao alcanca o campo alheio", await campoEDoProtocolo(revisaoDaAna, bruno, campoDaAna), false);
+checar("dono alcanca o proprio criterio", await criterioEDoProtocolo(revisaoDaAna, ana, criterioDaAna), true);
+checar(
+  "estranho nao alcanca o criterio alheio",
+  await criterioEDoProtocolo(revisaoDaAna, bruno, criterioDaAna),
+  false,
+);
+
+// O id do critério chega do formulário: salvar a revisão do Bruno passando um
+// id da Ana não pode reescrever o critério dela.
+await salvarCriterios(revisaoDoBruno, [
+  { id: criterioDaAna, tipo: "exclusao", descricao: "Sequestrado" },
+]);
+checar(
+  "criterio de outra revisao nao e reescrito",
+  (await db.select().from(criterio).where(eq(criterio.id, criterioDaAna)))[0]!.descricao,
+  "Fora do escopo",
+);
+
+console.log("\nCriação de revisão");
+
+const { criarProtocolo } = await import("../src/lib/protocolo");
+
+const novaDaAna = await criarProtocolo(ana, {
+  titulo: "Revisão nova da Ana",
+  questaoPesquisa: "O que já se sabe sobre isto?",
+  anoInicio: 2019,
+  anoFim: 2024,
+});
+
+checar("a revisão nasce com dono", await protocoloEDoUsuario(novaDaAna, ana), true);
+checar("e nao pertence a outra conta", await protocoloEDoUsuario(novaDaAna, bruno), false);
+checar(
+  "aparece na listagem de quem criou",
+  (await listarProtocolos(ana)).map((p) => p.titulo).includes("Revisão nova da Ana"),
+  true,
+);
+checar(
+  "nao aparece na listagem alheia",
+  (await listarProtocolos(bruno)).map((p) => p.titulo).includes("Revisão nova da Ana"),
+  false,
+);
+
+const criteriosIniciais = await listarCriteriosEditaveis(novaDaAna);
+checar("vem com criterios de inclusao", (await listarCriteriosDeInclusao(novaDaAna)).length, 2);
+checar("vem com criterios de exclusao", (await listarCriteriosDeExclusao(novaDaAna)).length, 5);
+checar(
+  "os codigos nao repetem",
+  new Set(criteriosIniciais.map((c) => c.codigo)).size,
+  criteriosIniciais.length,
+);
+checar(
+  "a ordem segue inclusao antes de exclusao",
+  criteriosIniciais.map((c) => c.codigo),
+  ["IC1", "IC2", "EC1", "EC2", "EC3", "EC4", "EC5"],
 );
 
 console.log(

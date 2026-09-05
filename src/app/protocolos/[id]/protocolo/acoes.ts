@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { exigirProtocolo } from "@/lib/autorizacao";
 import {
   atualizarProtocolo,
   salvarCriterios,
@@ -40,6 +41,8 @@ export async function salvarProtocolo(
   if (anoInicio !== null && anoFim !== null && anoInicio > anoFim) {
     return { estado: "erro", mensagem: "O ano inicial não pode ser maior que o final." };
   }
+
+  await exigirProtocolo(protocoloId);
 
   await atualizarProtocolo(protocoloId, {
     titulo,

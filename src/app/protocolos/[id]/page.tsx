@@ -1,9 +1,8 @@
 import { desc, eq } from "drizzle-orm";
-import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { busca } from "@/db/schema";
+import { protocoloDaPagina } from "@/lib/autorizacao";
 import {
-  buscarProtocolo,
   contarPorDecisao,
   LEITURA_COMPLETA,
   TRIAGEM_INICIAL,
@@ -21,8 +20,7 @@ export default async function PaginaDoProtocolo({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const protocolo = await buscarProtocolo(id);
-  if (!protocolo) notFound();
+  const protocolo = await protocoloDaPagina(id);
 
   const naTriagem = await contarPorDecisao(id, TRIAGEM_INICIAL);
   const naLeitura = await contarPorDecisao(id, LEITURA_COMPLETA);
