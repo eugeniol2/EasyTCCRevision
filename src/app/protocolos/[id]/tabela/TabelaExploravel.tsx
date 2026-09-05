@@ -18,11 +18,6 @@ function chaveDaLinha(autor: string, ano: string, posicao: number): string {
   return `${posicao}:${autor}:${ano}`;
 }
 
-/**
- * Clicar na linha alterna a expansão, mas selecionar texto dentro de uma
- * linha expandida também dispara clique — sem esta guarda, copiar um
- * trecho fecharia a linha no mesmo gesto.
- */
 function estaSelecionandoTexto(): boolean {
   return (window.getSelection()?.toString().length ?? 0) > 0;
 }

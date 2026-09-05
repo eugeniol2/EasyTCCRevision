@@ -64,10 +64,6 @@ export default function PainelDeExtracao({
     [protocoloId],
   );
 
-  // Criar e remover coluna mexem na tabela inteira e a tela só muda quando a
-  // resposta chega. Um clique repetido aqui criaria coluna duplicada ou
-  // tentaria remover o que já foi removido, então o botão sai de cena
-  // enquanto a ação corre.
   const [alterandoColunas, alterarColunas] = useAcao();
 
   if (campos.length === 0) {

@@ -21,8 +21,6 @@ export default function AcoesDoProtocolo({
 }: Props) {
   const [acaoPendente, setAcaoPendente] = useState<AcaoPendente>(null);
 
-  // O diálogo segura a tela e mostra o progresso enquanto a ação corre, então
-  // ele só se fecha depois que ela termina.
   async function confirmar() {
     if (acaoPendente === "zerar") await zerarTriagem(protocoloId);
     else if (acaoPendente === "descartar") await descartarTudo(protocoloId);

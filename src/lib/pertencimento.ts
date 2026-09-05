@@ -2,16 +2,6 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { campoExtracao, criterio, estudo, protocolo } from "@/db/schema";
 
-/**
- * Toda entidade do sistema pende de um protocolo, e o protocolo pende de um
- * usuário. Confirmar as duas pontas na mesma consulta — que o item é daquele
- * protocolo e que o protocolo é de quem está pedindo — é o que impede alguém
- * de operar sobre a revisão de outra pessoa trocando um identificador na
- * requisição.
- *
- * Protocolo sem dono não é de ninguém: a comparação com um `usuarioId` real
- * dá falso, que é a resposta desejada.
- */
 export async function protocoloEDoUsuario(
   protocoloId: string,
   usuarioId: string,

@@ -16,11 +16,6 @@ export async function usuarioAtual(): Promise<string> {
   return usuarioId;
 }
 
-/**
- * Guarda das páginas: uma revisão que não é sua não existe para você. O 404 é
- * proposital — um "sem permissão" confirmaria que aquele identificador é
- * válido em alguma outra conta.
- */
 export async function protocoloDaPagina(protocoloId: string) {
   const usuarioId = await usuarioAtual();
   const encontrado = await buscarProtocolo(protocoloId);
@@ -36,11 +31,6 @@ class SemAcesso extends Error {
   }
 }
 
-/**
- * Guardas das server actions. Diferente das páginas, aqui não há o que
- * renderizar: só se chega neste caminho adulterando a requisição, então
- * interromper com erro é a resposta certa.
- */
 export async function exigirProtocolo(protocoloId: string): Promise<void> {
   const usuarioId = await usuarioAtual();
   if (!(await protocoloEDoUsuario(protocoloId, usuarioId))) throw new SemAcesso();

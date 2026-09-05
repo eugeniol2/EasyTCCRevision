@@ -22,8 +22,6 @@ export const usuario = pgTable(
   "usuario",
   {
     id: text("id").primaryKey(),
-    // 'sub' do Google: identificador estável, ao contrário do e-mail, que a
-    // instituição pode reatribuir.
     googleSub: text("google_sub").notNull(),
     email: text("email").notNull(),
     nome: text("nome"),
@@ -39,9 +37,6 @@ export const usuario = pgTable(
 
 export const protocolo = pgTable("protocolo", {
   id: text("id").primaryKey(),
-  // A coluna aceita nulo por causa dos protocolos anteriores à autenticação,
-  // já migrados. Um protocolo sem dono é invisível para todo mundo, então a
-  // ausência de valor falha fechada.
   usuarioId: text("usuario_id").references(() => usuario.id, {
     onDelete: "cascade",
   }),
@@ -84,8 +79,6 @@ export const busca = pgTable(
     executadaEm: integer("executada_em").notNull(),
     totalResultados: integer("total_resultados"),
     notas: text("notas"),
-    // Duas buscas podem ter a mesma data de execução; sem um desempate a
-    // ordenação da listagem fica indefinida.
     criadoEm: integer("criado_em").notNull().default(AGORA),
   },
   (tabela) => ({

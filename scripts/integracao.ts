@@ -11,8 +11,6 @@ if (!URL_DE_TESTE) {
   process.exit(1);
 }
 
-// Precisa vir antes de qualquer import de src/db/client, que lê esta
-// variável ao ser carregado.
 process.env.DATABASE_URL = URL_DE_TESTE;
 
 let verificacoesQuePassaram = 0;
@@ -36,13 +34,8 @@ function checar(descricao: string, obtido: unknown, esperado: unknown): void {
   );
 }
 
-// Import dinâmico: `src/db/client` lê DATABASE_FILE ao ser carregado, e
-// um `import` estático seria içado para antes da atribuição acima — o
-// teste rodaria contra o banco de desenvolvimento sem avisar.
 const { db, fecharBanco } = await import("../src/db/client");
 
-// O banco de teste é um database separado no mesmo projeto Neon; limpar as
-// tabelas substitui o "apagar o arquivo" que o SQLite permitia.
 await db.execute(
   sqlBruto`truncate table extracao, atendimento, estudo_busca, triagem,
     campo_extracao, estudo, busca, criterio, protocolo, usuario
@@ -647,7 +640,6 @@ const metodologia = await textoDaMetodologia(protocoloId);
 checar("metodologia cita os incluidos", metodologia.includes(`${prisma.incluidos} estudo(s) compuseram`), true);
 checar("metodologia cita as bases", metodologia.includes("base(s) de dados"), true);
 
-
 console.log("");
 console.log("Checklist de inclusao");
 const criteriosParaChecar = await listarCriteriosDeInclusao(protocoloId);
@@ -876,8 +868,6 @@ checar(
   false,
 );
 
-// O id do critério chega do formulário: salvar a revisão do Bruno passando um
-// id da Ana não pode reescrever o critério dela.
 await salvarCriterios(revisaoDoBruno, [
   { id: criterioDaAna, tipo: "exclusao", descricao: "Sequestrado" },
 ]);

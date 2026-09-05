@@ -25,11 +25,6 @@ const PREFIXO_POR_TIPO: Record<TipoDeCriterio, string> = {
   exclusao: "EC",
 };
 
-/**
- * Uma revisão nasce com os critérios que quase toda revisão sistemática usa.
- * São um ponto de partida para editar, não uma regra: quem cria ajusta os
- * textos e apaga o que não servir na tela do protocolo.
- */
 const CRITERIOS_INICIAIS: Omit<CriterioEditavel, "id" | "usadoEmExclusoes">[] = [
   { tipo: "inclusao", codigo: "IC1", descricao: "Estudo primário sobre o tema da questão de pesquisa" },
   { tipo: "inclusao", codigo: "IC2", descricao: "Texto completo disponível" },
@@ -119,11 +114,6 @@ export interface ResumoDaGravacao {
   removidos: number;
 }
 
-/**
- * O código de um critério já existente nunca muda: ele aparece no texto da
- * metodologia e no relatório de exclusões, então renumerar reescreveria o
- * passado. Critérios novos recebem o menor número livre do seu tipo.
- */
 export async function salvarCriterios(
   protocoloId: string,
   recebidos: CriterioRecebido[],
@@ -175,8 +165,6 @@ export async function salvarCriterios(
         continue;
       }
 
-      // O protocolo entra no filtro porque o id do critério chega do
-      // formulário: sem ele, um id de outra revisão seria reescrito aqui.
       await transacao
         .update(criterio)
         .set({ tipo: item.tipo, descricao, ordem })

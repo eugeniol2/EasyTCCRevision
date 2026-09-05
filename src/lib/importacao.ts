@@ -22,11 +22,6 @@ export interface BuscaIdentica {
   registrosJaVinculados: number;
 }
 
-/**
- * O Google Scholar exporta uma citação por vez, então a mesma busca acaba
- * sendo importada em partes. Sem detectar isso, cada parte vira uma busca
- * nova e o "identificados" do PRISMA infla a cada importação.
- */
 export async function encontrarBuscaIdentica(
   protocoloId: string,
   base: string,

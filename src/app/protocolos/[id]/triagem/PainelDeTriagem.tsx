@@ -129,10 +129,6 @@ export default function PainelDeTriagem({
       ),
   );
 
-  // A tela muda na hora e a gravação corre atrás. Essas ações não desabilitam
-  // nada — na triagem se decide um estudo atrás do outro, e travar o botão a
-  // cada clique atrapalharia mais do que ajuda. Elas só se anunciam ao
-  // indicador, para quem quiser saber que ainda há coisa sendo salva.
   const [, gravarEmSegundoPlano] = useAcao();
 
   const alternarCriterio = useCallback(

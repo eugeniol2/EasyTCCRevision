@@ -14,13 +14,6 @@ type Registrar = (variacao: number) => void;
 
 const ContagemDeAcoes = createContext<Registrar>(() => {});
 
-/**
- * O indicador global responde "algo está acontecendo?", que é a pergunta de
- * quem clicou e não viu nada mudar. Ele não bloqueia a tela: quem impede o
- * clique repetido é o próprio botão, que se desabilita enquanto sua ação
- * corre. Um véu sobre tudo tornaria a triagem, onde cada decisão é gravada em
- * segundo plano, lenta de usar sem necessidade.
- */
 export function ProvedorDeCarregamento({ children }: { children: ReactNode }) {
   const [acoesEmAndamento, setAcoesEmAndamento] = useState(0);
 
@@ -41,12 +34,6 @@ export function ProvedorDeCarregamento({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * Substitui o `useTransition` cru nos pontos que chamam server actions: além
- * do estado local para desabilitar o botão, anuncia a ação ao indicador
- * global. A contagem cai sozinha quando a ação termina ou quando o componente
- * sai da tela no meio dela.
- */
 export function useAcao(): [boolean, (acao: () => void | Promise<void>) => void] {
   const registrar = useContext(ContagemDeAcoes);
   const [executando, iniciar] = useTransition();

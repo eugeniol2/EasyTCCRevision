@@ -21,9 +21,6 @@ export default function DialogoDeConfirmacao({
   const botaoCancelar = useRef<HTMLButtonElement>(null);
   const [confirmando, iniciar] = useAcao();
 
-  // Confirmar é o clique que apaga coisas: enquanto a ação corre, o diálogo
-  // continua na tela mostrando que trabalha, e não aceita um segundo clique
-  // nem o fechamento pelo fundo.
   const confirmar = useCallback(() => {
     if (confirmando) return;
     iniciar(async () => {
@@ -31,9 +28,6 @@ export default function DialogoDeConfirmacao({
     });
   }, [confirmando, iniciar, onConfirmar]);
 
-  // O foco vai para o botão seguro. Um botão focado é acionado por Enter ou
-  // espaço pelo próprio navegador, então deixá-lo no lado destrutivo faria a
-  // tecla apagar coisas mesmo sem atalho nenhum no código.
   useEffect(() => {
     botaoCancelar.current?.focus();
   }, []);

@@ -93,11 +93,6 @@ export interface EstudoParaExtracao {
 
 const decisaoDaFase1 = alias(triagem, "fase1");
 
-/**
- * Só entram na extração os estudos incluídos nas duas fases. Exigir apenas
- * a fase 2 deixava passar registros órfãos: decisões de leitura tomadas
- * antes de a decisão da fase 1 ser revista para fora do funil.
- */
 export async function listarEstudosParaExtracao(
   protocoloId: string,
 ): Promise<EstudoParaExtracao[]> {

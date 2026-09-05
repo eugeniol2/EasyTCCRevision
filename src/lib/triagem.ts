@@ -16,11 +16,6 @@ export interface DecisaoDeTriagem {
   criterioId: string | null;
 }
 
-/**
- * A decisão de leitura só faz sentido enquanto o estudo está no funil.
- * Quando a fase 1 deixa de incluí-lo, a linha da fase 2 vira órfã: some da
- * contagem, mas reapareceria intacta se o estudo fosse reincluído depois.
- */
 async function limparDecisaoDeLeitura(estudoId: string): Promise<void> {
   await db.delete(triagem)
     .where(

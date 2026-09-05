@@ -10,11 +10,6 @@ export interface UsuarioAutenticado {
   imagem: string | null;
 }
 
-/**
- * Chamado a cada login. A chave é o 'sub' do Google, não o e-mail: a
- * instituição pode reatribuir um endereço a outra pessoa, e nesse caso o
- * histórico não deve migrar junto.
- */
 export async function registrarAcesso(dados: {
   googleSub: string;
   email: string;

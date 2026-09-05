@@ -101,11 +101,6 @@ async function agruparBasesPorEstudo(protocoloId: string): Promise<Map<string, s
 
 const decisaoDaEtapaAnterior = alias(triagem, "etapa_anterior");
 
-/**
- * A leitura de texto completo enxerga apenas o que foi incluído na triagem
- * inicial. Sem esse filtro, o segundo estágio reapresentaria os estudos já
- * descartados e o denominador do PRISMA sairia inflado.
- */
 function somenteDoEstagio(protocoloId: string, estagio: EstagioDeTriagem) {
   const doProtocolo = eq(estudo.protocoloId, protocoloId);
 

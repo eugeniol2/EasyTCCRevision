@@ -9,7 +9,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     ...configuracaoDeAutenticacao.callbacks,
 
     async jwt({ token, profile }) {
-      // 'profile' só vem no login; nas renovações o token já traz o usuário.
       if (!profile?.sub || !profile.email) return token;
       if (!pertenceAoDominio(profile.email)) return token;
 

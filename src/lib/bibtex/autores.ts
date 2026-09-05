@@ -77,12 +77,6 @@ function pareceIniciais(texto: string): boolean {
   return texto.trim() !== "" && SO_INICIAIS.test(texto.trim());
 }
 
-/**
- * A convenção BibTeX é "Sobrenome, Nome", mas a exportação da IEEE inverte
- * para alguns autores — "A M M I P, Athapaththu" no mesmo registro em que
- * escreve "Yapa, Kanishka" corretamente. Um sobrenome composto apenas de
- * letras isoladas é sempre iniciais, então a troca é segura.
- */
 function parseNomeComSobrenomeNaFrente(partes: string[]): Autor {
   const antesDaVirgula = latexParaUnicode(partes[0]!);
   const depoisDaVirgula = latexParaUnicode(partes[partes.length - 1]!);

@@ -3,8 +3,6 @@ import { criarProtocolo } from "../lib/protocolo";
 import { db, fecharBanco } from "./client";
 import { usuario } from "./schema";
 
-// Protocolo sem dono fica invisível para todo mundo, então o seed precisa
-// saber de quem é. A conta tem que existir: ela nasce no primeiro login.
 const email = process.argv[2];
 
 if (!email) {
