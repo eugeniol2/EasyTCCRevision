@@ -1,5 +1,13 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import { DESCRICAO_DO_SITE } from "@/lib/site";
+
+export const metadata: Metadata = {
+  title: "Entrar",
+  description: DESCRICAO_DO_SITE,
+  alternates: { canonical: "/entrar" },
+};
 
 export default async function PaginaDeEntrada({
   searchParams,
