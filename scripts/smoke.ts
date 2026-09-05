@@ -1,5 +1,11 @@
 import { deduplicar } from "../src/lib/dedup";
 import { analisarDominios, emailPermitido } from "../src/lib/dominio";
+import {
+  MAXIMO_DE_CARACTERES,
+  MAXIMO_DE_ENTRADAS,
+  recusaPorQuantidade,
+  recusaPorTamanho,
+} from "../src/lib/limites";
 import { formatarAutores, parseAutores } from "../src/lib/bibtex/autores";
 import { latexParaUnicode } from "../src/lib/bibtex/latex";
 import { entradaParaEstudo } from "../src/lib/bibtex/paraEstudo";
@@ -341,6 +347,36 @@ checar(
 checar("inicial com ponto tambem troca", parseAutores("J. R., Tolkien")[0]!.family, "Tolkien");
 checar("sobrenome normal permanece", parseAutores("Knuth, Donald E.")[0]!.family, "Knuth");
 checar("particula permanece", parseAutores("van der Berg, Jan")[0]!.family, "van der Berg");
+
+secao("Limites da importação");
+
+checar("conteúdo normal passa", recusaPorTamanho("@article{a, title={x}}"), null);
+checar("conteúdo vazio passa", recusaPorTamanho(""), null);
+checar(
+  "no limite exato ainda passa",
+  recusaPorTamanho("x".repeat(MAXIMO_DE_CARACTERES)),
+  null,
+);
+checar(
+  "um caractere acima é recusado",
+  recusaPorTamanho("x".repeat(MAXIMO_DE_CARACTERES + 1)) !== null,
+  true,
+);
+
+checar("poucas entradas passam", recusaPorQuantidade(10), null);
+checar("nenhuma entrada passa", recusaPorQuantidade(0), null);
+checar("no limite exato ainda passa", recusaPorQuantidade(MAXIMO_DE_ENTRADAS), null);
+checar(
+  "uma entrada acima é recusada",
+  recusaPorQuantidade(MAXIMO_DE_ENTRADAS + 1) !== null,
+  true,
+);
+checar(
+  "a recusa diz quantas vieram e qual é o teto",
+  recusaPorQuantidade(2000)?.includes("2.000") === true &&
+    recusaPorQuantidade(2000)?.includes("500") === true,
+  true,
+);
 
 secao("Domínios permitidos");
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { exigirProtocolo } from "@/lib/autorizacao";
 import { encontrarBuscaIdentica, importarParaOProtocolo } from "@/lib/importacao";
+import { recusaPorTamanho } from "@/lib/limites";
 import {
   RESULTADO_INICIAL,
   resultadoComErro,
@@ -32,6 +33,9 @@ export async function importarBibtex(
   if (!stringBusca) return resultadoComErro("Informe a string de busca usada.");
   if (!executadaEm) return resultadoComErro("Informe a data em que a busca foi executada.");
   if (!conteudo) return resultadoComErro("Escolha o arquivo exportado ou cole o conteúdo.");
+
+  const grandeDemais = recusaPorTamanho(conteudo);
+  if (grandeDemais) return resultadoComErro(grandeDemais);
 
   await exigirProtocolo(protocoloId);
 
@@ -65,6 +69,8 @@ export async function importarBibtex(
     conteudo,
     anexarABusca: modo === "anexar" ? (identica?.id ?? null) : null,
   });
+
+  if (resumo.recusa) return resultadoComErro(resumo.recusa);
 
   if (resumo.entradasLidas === 0) {
     return resultadoComErro(

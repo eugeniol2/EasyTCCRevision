@@ -780,6 +780,58 @@ checar(
   2,
 );
 
+console.log("\nLimites da importação");
+
+const { MAXIMO_DE_ENTRADAS } = await import("../src/lib/limites");
+
+function bibtexCom(quantidade: number): string {
+  const entradas: string[] = [];
+  for (let i = 0; i < quantidade; i++) {
+    entradas.push(`@article{k${i}, title={Titulo numero ${i}}, author={Autor, A}, year={2024}}`);
+  }
+  return entradas.join("\n\n");
+}
+
+const protocoloDoLimite = randomUUID();
+await db.insert(protocolo).values({ id: protocoloDoLimite, titulo: "Protocolo do limite" });
+
+const buscasAntesDoLimite = (await db.select().from(busca)).length;
+const estudosAntes = (await db.select().from(estudo)).length;
+
+const excedente = await importarParaOProtocolo({
+  protocoloId: protocoloDoLimite,
+  base: "IEEE Xplore",
+  stringBusca: "teste",
+  executadaEmSegundos: 1000,
+  conteudo: bibtexCom(MAXIMO_DE_ENTRADAS + 1),
+  anexarABusca: null,
+});
+
+checar("acima do limite a importacao e recusada", excedente.recusa !== null, true);
+checar("e nada e importado", excedente.importados, 0);
+checar(
+  "nenhuma busca foi gravada",
+  (await db.select().from(busca)).length,
+  buscasAntesDoLimite,
+);
+checar(
+  "nenhum estudo foi gravado",
+  (await db.select().from(estudo)).length,
+  estudosAntes,
+);
+
+const noLimite = await importarParaOProtocolo({
+  protocoloId: protocoloDoLimite,
+  base: "IEEE Xplore",
+  stringBusca: "teste no limite",
+  executadaEmSegundos: 2000,
+  conteudo: bibtexCom(MAXIMO_DE_ENTRADAS),
+  anexarABusca: null,
+});
+
+checar("exatamente no limite passa", noLimite.recusa, null);
+checar("e importa tudo", noLimite.importados, MAXIMO_DE_ENTRADAS);
+
 console.log("\nIsolamento entre contas");
 
 const { campoExtracao, usuario } = await import("../src/db/schema");

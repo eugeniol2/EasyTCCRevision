@@ -5,6 +5,7 @@ import { busca, estudo, estudoBusca } from "@/db/schema";
 import type { EstudoImportado } from "@/lib/bibtex/paraEstudo";
 import { deduplicar } from "@/lib/dedup";
 import { lerArquivo } from "@/lib/leitura";
+import { recusaPorQuantidade, recusaPorTamanho } from "@/lib/limites";
 
 export interface DadosDaImportacao {
   protocoloId: string;
@@ -69,6 +70,7 @@ export interface ResumoDaImportacao {
   jaExistiamNoProtocolo: number;
   suspeitas: SuspeitaDeDuplicata[];
   linhasComErro: string[];
+  recusa: string | null;
 }
 
 interface EstudoJaSalvo {
@@ -99,9 +101,25 @@ async function listarJaSalvos(protocoloId: string): Promise<EstudoJaSalvo[]> {
     .where(eq(estudo.protocoloId, protocoloId));
 }
 
+function importacaoRecusada(motivo: string): ResumoDaImportacao {
+  return {
+    buscaId: null,
+    entradasLidas: 0,
+    importados: 0,
+    duplicatasNoArquivo: 0,
+    jaExistiamNoProtocolo: 0,
+    suspeitas: [],
+    linhasComErro: [],
+    recusa: motivo,
+  };
+}
+
 export async function importarParaOProtocolo(
   dados: DadosDaImportacao,
 ): Promise<ResumoDaImportacao> {
+  const recusaDeTamanho = recusaPorTamanho(dados.conteudo);
+  if (recusaDeTamanho) return importacaoRecusada(recusaDeTamanho);
+
   const arquivoLido = lerArquivo(dados.conteudo);
 
   if (arquivoLido.estudos.length === 0) {
@@ -113,8 +131,12 @@ export async function importarParaOProtocolo(
       jaExistiamNoProtocolo: 0,
       suspeitas: [],
       linhasComErro: arquivoLido.erros,
+      recusa: null,
     };
   }
+
+  const recusaDeQuantidade = recusaPorQuantidade(arquivoLido.estudos.length);
+  if (recusaDeQuantidade) return importacaoRecusada(recusaDeQuantidade);
 
   const { unicos, fundidos, suspeitas } = deduplicar(arquivoLido.estudos);
 
@@ -194,5 +216,6 @@ export async function importarParaOProtocolo(
       })),
     ),
     linhasComErro: arquivoLido.erros,
+    recusa: null,
   };
 }

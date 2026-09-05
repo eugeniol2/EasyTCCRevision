@@ -12,6 +12,7 @@ import {
 } from "react";
 import { Girando } from "@/app/componentes/Carregamento";
 import { lerArquivo } from "@/lib/leitura";
+import { recusaPorQuantidade, recusaPorTamanho } from "@/lib/limites";
 import { importarBibtex } from "./acoes";
 import ComoExportar from "./ComoExportar";
 import { RESULTADO_INICIAL } from "./resultado";
@@ -82,8 +83,17 @@ export default function FormularioDeImportacao({
   const conteudoAdiado = useDeferredValue(conteudo);
   const analise = useMemo(() => {
     if (conteudoAdiado.trim() === "") return null;
+
+    const grandeDemais = recusaPorTamanho(conteudoAdiado);
+    if (grandeDemais) return { recusa: grandeDemais, formato: null, entradas: 0, erros: 0 };
+
     const { formato, estudos, erros } = lerArquivo(conteudoAdiado);
-    return { formato, entradas: estudos.length, erros: erros.length };
+    return {
+      recusa: recusaPorQuantidade(estudos.length),
+      formato,
+      entradas: estudos.length,
+      erros: erros.length,
+    };
   }, [conteudoAdiado]);
 
   async function carregar(arquivo: File | undefined) {
@@ -194,7 +204,8 @@ export default function FormularioDeImportacao({
             value={conteudo}
             onChange={(evento) => setConteudo(evento.target.value)}
           />
-          {analise && (
+          {analise?.recusa && <div className="aviso">{analise.recusa}</div>}
+          {analise && !analise.recusa && (
             <p className="subtitulo" style={{ marginTop: "0.4rem" }}>
               {analise.entradas === 0
                 ? "Nenhuma entrada reconhecida — envie o .bib ou o .csv exportado pela base."
@@ -206,7 +217,11 @@ export default function FormularioDeImportacao({
         </div>
 
         <div className="linha-acoes">
-          <button type="submit" className="botao botao-primario" disabled={enviando}>
+          <button
+            type="submit"
+            className="botao botao-primario"
+            disabled={enviando || Boolean(analise?.recusa)}
+          >
             {enviando && <Girando />}
           {enviando ? "Importando…" : "Importar"}
           </button>
