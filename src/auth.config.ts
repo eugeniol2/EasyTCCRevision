@@ -1,11 +1,11 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
+import { analisarDominios, emailPermitido } from "@/lib/dominio";
 
-const DOMINIO_PERMITIDO = process.env.DOMINIO_PERMITIDO;
+const DOMINIOS_PERMITIDOS = analisarDominios(process.env.DOMINIO_PERMITIDO);
 
 export function pertenceAoDominio(email: string | null | undefined): boolean {
-  if (!DOMINIO_PERMITIDO) return true;
-  return email?.toLowerCase().endsWith(`@${DOMINIO_PERMITIDO}`) ?? false;
+  return emailPermitido(email, DOMINIOS_PERMITIDOS);
 }
 
 /**

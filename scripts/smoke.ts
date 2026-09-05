@@ -1,4 +1,5 @@
 import { deduplicar } from "../src/lib/dedup";
+import { analisarDominios, emailPermitido } from "../src/lib/dominio";
 import { formatarAutores, parseAutores } from "../src/lib/bibtex/autores";
 import { latexParaUnicode } from "../src/lib/bibtex/latex";
 import { entradaParaEstudo } from "../src/lib/bibtex/paraEstudo";
@@ -340,6 +341,47 @@ checar(
 checar("inicial com ponto tambem troca", parseAutores("J. R., Tolkien")[0]!.family, "Tolkien");
 checar("sobrenome normal permanece", parseAutores("Knuth, Donald E.")[0]!.family, "Knuth");
 checar("particula permanece", parseAutores("van der Berg, Jan")[0]!.family, "van der Berg");
+
+secao("Domínios permitidos");
+
+function recusaConfiguracao(configuracao: string | undefined): boolean {
+  try {
+    analisarDominios(configuracao);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+checar("variavel ausente e recusada", recusaConfiguracao(undefined), true);
+checar("variavel vazia e recusada", recusaConfiguracao(""), true);
+checar("so espaco e recusado", recusaConfiguracao("   "), true);
+checar("so virgulas e recusado", recusaConfiguracao(",,"), true);
+checar("asterisco libera geral", analisarDominios("*"), "todos");
+checar("um dominio", analisarDominios("ufrpe.br"), ["ufrpe.br"]);
+checar("lista com espacos", analisarDominios(" ufrpe.br , gmail.com "), ["ufrpe.br", "gmail.com"]);
+checar("maiuscula normaliza", analisarDominios("UFRPE.br"), ["ufrpe.br"]);
+checar("arroba sobrando some", analisarDominios("@ufrpe.br"), ["ufrpe.br"]);
+checar("aspas coladas do .env somem", analisarDominios('"ufrpe.br"'), ["ufrpe.br"]);
+checar("aspas simples tambem", analisarDominios("'ufrpe.br'"), ["ufrpe.br"]);
+checar("aspas em volta da lista", analisarDominios('"ufrpe.br,gmail.com"'), ["ufrpe.br", "gmail.com"]);
+checar("aspas em volta do asterisco", analisarDominios('"*"'), "todos");
+checar("so aspas e recusado", recusaConfiguracao('""'), true);
+
+const soUfrpe = analisarDominios("ufrpe.br");
+const doisDominios = analisarDominios("ufrpe.br,gmail.com");
+
+checar("conta do dominio entra", emailPermitido("alguem@ufrpe.br", soUfrpe), true);
+checar("maiuscula no email entra", emailPermitido("Alguem@UFRPE.br", soUfrpe), true);
+checar("espaco em volta nao atrapalha", emailPermitido("  alguem@ufrpe.br ", soUfrpe), true);
+checar("conta de fora fica de fora", emailPermitido("alguem@gmail.com", soUfrpe), false);
+checar("dominio parecido nao passa", emailPermitido("alguem@naoufrpe.br", soUfrpe), false);
+checar("subdominio nao passa", emailPermitido("alguem@ic.ufrpe.br", soUfrpe), false);
+checar("dominio no meio nao passa", emailPermitido("ufrpe.br@gmail.com", soUfrpe), false);
+checar("email vazio nao passa", emailPermitido(null, soUfrpe), false);
+checar("segundo dominio da lista entra", emailPermitido("alguem@gmail.com", doisDominios), true);
+checar("fora dos dois nao entra", emailPermitido("alguem@ufpe.br", doisDominios), false);
+checar("liberado geral aceita qualquer um", emailPermitido("alguem@qualquer.com", "todos"), true);
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,
