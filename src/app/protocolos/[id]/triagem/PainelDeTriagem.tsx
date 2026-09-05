@@ -479,12 +479,17 @@ export default function PainelDeTriagem({
         >
           <p className="modal-corpo">
             O artigo sai do protocolo inteiro, com todas as decisões e dados
-            extraídos. Não dá para desfazer — só reimportando o arquivo. Para
-            apenas rejeitá-lo, use “Não incluir”.
+            extraídos. Não dá para desfazer — só reimportando o arquivo.
           </p>
           <div className="modal-estudo">
             <p>{estudos.find((estudo) => estudo.id === descartePendente)?.titulo}</p>
           </div>
+          <p className="aviso modal-alternativa">
+            Se você só quer deixá-lo de fora da revisão, cancele e use{" "}
+            <strong>Não incluir</strong>, apontando o motivo. Assim ele
+            continua no protocolo e aparece no PRISMA como excluído — que é o
+            que a metodologia pede.
+          </p>
         </DialogoDeConfirmacao>
       )}
 

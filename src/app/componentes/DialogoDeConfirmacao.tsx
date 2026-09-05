@@ -18,12 +18,12 @@ export default function DialogoDeConfirmacao({
   onCancelar,
   children,
 }: Props) {
-  const botaoConfirmar = useRef<HTMLButtonElement>(null);
+  const botaoCancelar = useRef<HTMLButtonElement>(null);
   const [confirmando, iniciar] = useAcao();
 
   // Confirmar é o clique que apaga coisas: enquanto a ação corre, o diálogo
   // continua na tela mostrando que trabalha, e não aceita um segundo clique
-  // nem o fechamento por Esc ou pelo fundo.
+  // nem o fechamento pelo fundo.
   const confirmar = useCallback(() => {
     if (confirmando) return;
     iniciar(async () => {
@@ -31,27 +31,12 @@ export default function DialogoDeConfirmacao({
     });
   }, [confirmando, iniciar, onConfirmar]);
 
+  // O foco vai para o botão seguro. Um botão focado é acionado por Enter ou
+  // espaço pelo próprio navegador, então deixá-lo no lado destrutivo faria a
+  // tecla apagar coisas mesmo sem atalho nenhum no código.
   useEffect(() => {
-    botaoConfirmar.current?.focus();
+    botaoCancelar.current?.focus();
   }, []);
-
-  useEffect(() => {
-    function aoTeclar(evento: KeyboardEvent) {
-      if (confirmando) return;
-
-      if (evento.key === "Escape") {
-        evento.preventDefault();
-        onCancelar();
-      }
-      if (evento.key === "Enter") {
-        evento.preventDefault();
-        confirmar();
-      }
-    }
-
-    window.addEventListener("keydown", aoTeclar);
-    return () => window.removeEventListener("keydown", aoTeclar);
-  }, [confirmando, confirmar, onCancelar]);
 
   return (
     <div
@@ -75,15 +60,15 @@ export default function DialogoDeConfirmacao({
 
         <div className="modal-acoes">
           <button
+            ref={botaoCancelar}
             type="button"
             className="botao"
             onClick={onCancelar}
             disabled={confirmando}
           >
-            Cancelar <kbd>Esc</kbd>
+            Cancelar
           </button>
           <button
-            ref={botaoConfirmar}
             type="button"
             className="botao botao-perigo"
             onClick={confirmar}
@@ -95,9 +80,7 @@ export default function DialogoDeConfirmacao({
                 Processando…
               </>
             ) : (
-              <>
-                {rotuloConfirmar} <kbd>Enter</kbd>
-              </>
+              rotuloConfirmar
             )}
           </button>
         </div>

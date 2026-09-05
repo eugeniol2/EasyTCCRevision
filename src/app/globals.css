@@ -455,12 +455,6 @@ textarea {
   color: #fff;
 }
 
-.botao-perigo kbd {
-  border-color: rgba(255, 255, 255, 0.45);
-  background: transparent;
-  color: rgba(255, 255, 255, 0.9);
-}
-
 .botao-perigo-suave {
   color: var(--excluir);
   border-color: var(--borda);
@@ -1026,18 +1020,6 @@ body.redimensionando {
   border-color: var(--excluir);
 }
 
-kbd {
-  font-family: ui-monospace, Consolas, monospace;
-  font-size: 0.75rem;
-  border: 1px solid var(--borda);
-  border-bottom-width: 2px;
-  border-radius: 5px;
-  padding: 0.1rem 0.4rem;
-  background: var(--fundo);
-  color: var(--texto-suave);
-  white-space: nowrap;
-}
-
 .atalhos {
   display: flex;
   gap: 1rem;
@@ -1098,6 +1080,13 @@ kbd {
   border-radius: 0 var(--raio) var(--raio) 0;
   font-size: 0.875rem;
   margin-top: 1rem;
+}
+
+/* A saída menos destrutiva é a que a maioria quer: fica em destaque logo
+   acima dos botões, para ser a última coisa lida antes de confirmar. */
+.modal-alternativa {
+  margin: 0 0 1.25rem;
+  color: var(--texto);
 }
 
 .lista-limpa {
