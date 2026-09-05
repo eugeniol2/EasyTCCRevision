@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import DialogoDeConfirmacao from "@/app/componentes/DialogoDeConfirmacao";
 import { descartarTudo, zerarTriagem } from "./acoes";
 
@@ -20,16 +20,14 @@ export default function AcoesDoProtocolo({
   buscasRegistradas,
 }: Props) {
   const [acaoPendente, setAcaoPendente] = useState<AcaoPendente>(null);
-  const [executando, iniciar] = useTransition();
 
-  function confirmar() {
-    const acao = acaoPendente;
+  // O diálogo segura a tela e mostra o progresso enquanto a ação corre, então
+  // ele só se fecha depois que ela termina.
+  async function confirmar() {
+    if (acaoPendente === "zerar") await zerarTriagem(protocoloId);
+    else if (acaoPendente === "descartar") await descartarTudo(protocoloId);
+
     setAcaoPendente(null);
-    iniciar(() => {
-      void (acao === "zerar"
-        ? zerarTriagem(protocoloId)
-        : descartarTudo(protocoloId));
-    });
   }
 
   return (
@@ -37,7 +35,7 @@ export default function AcoesDoProtocolo({
       <button
         type="button"
         className="botao"
-        disabled={decisoesTomadas === 0 || executando}
+        disabled={decisoesTomadas === 0}
         onClick={() => setAcaoPendente("zerar")}
       >
         Zerar triagem
@@ -46,10 +44,10 @@ export default function AcoesDoProtocolo({
       <button
         type="button"
         className="botao botao-perigo-suave"
-        disabled={totalDeEstudos === 0 || executando}
+        disabled={totalDeEstudos === 0}
         onClick={() => setAcaoPendente("descartar")}
       >
-        {executando ? "Processando..." : "Descartar tudo"}
+        Descartar tudo
       </button>
 
       {acaoPendente === "zerar" && (

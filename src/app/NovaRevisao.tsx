@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Girando } from "@/app/componentes/Carregamento";
 import { criarRevisao, type ResultadoDaCriacao } from "./acoes";
 
 const RESULTADO_INICIAL: ResultadoDaCriacao = { estado: "inicial", mensagem: "" };
@@ -78,7 +79,8 @@ export default function NovaRevisao({ comecarAberto }: Props) {
 
       <div className="linha-acoes">
         <button type="submit" className="botao botao-primario" disabled={enviando}>
-          {enviando ? "Criando..." : "Criar revisão"}
+          {enviando && <Girando />}
+          {enviando ? "Criando…" : "Criar revisão"}
         </button>
         {!comecarAberto && (
           <button

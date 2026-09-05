@@ -10,6 +10,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import { Girando } from "@/app/componentes/Carregamento";
 import { lerArquivo } from "@/lib/leitura";
 import { importarBibtex } from "./acoes";
 import { RESULTADO_INICIAL } from "./resultado";
@@ -195,7 +196,8 @@ export default function FormularioDeImportacao({
 
         <div className="linha-acoes">
           <button type="submit" className="botao botao-primario" disabled={enviando}>
-            {enviando ? "Importando..." : "Importar"}
+            {enviando && <Girando />}
+          {enviando ? "Importando…" : "Importar"}
           </button>
         </div>
       </form>

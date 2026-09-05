@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { ProvedorDeCarregamento } from "./componentes/Carregamento";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,7 +12,9 @@ export default function LayoutRaiz({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
       <body>
-        <div className="container">{children}</div>
+        <ProvedorDeCarregamento>
+          <div className="container">{children}</div>
+        </ProvedorDeCarregamento>
       </body>
     </html>
   );

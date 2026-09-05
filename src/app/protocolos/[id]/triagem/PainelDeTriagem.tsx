@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAcao } from "@/app/componentes/Carregamento";
 import DialogoDeConfirmacao from "@/app/componentes/DialogoDeConfirmacao";
 import { formatarAutores } from "@/lib/bibtex/autores";
 import { formatarMes } from "@/lib/publicacao";
@@ -128,6 +129,12 @@ export default function PainelDeTriagem({
       ),
   );
 
+  // A tela muda na hora e a gravação corre atrás. Essas ações não desabilitam
+  // nada — na triagem se decide um estudo atrás do outro, e travar o botão a
+  // cada clique atrapalharia mais do que ajuda. Elas só se anunciam ao
+  // indicador, para quem quiser saber que ainda há coisa sendo salva.
+  const [, gravarEmSegundoPlano] = useAcao();
+
   const alternarCriterio = useCallback(
     (estudoId: string, criterioId: string, marcado: boolean) => {
       setAtendidos((anteriores) => {
@@ -138,9 +145,11 @@ export default function PainelDeTriagem({
         atualizados.set(estudoId, doEstudo);
         return atualizados;
       });
-      void alternarAtendimento(protocoloId, estudoId, criterioId, marcado);
+      gravarEmSegundoPlano(async () => {
+        await alternarAtendimento(protocoloId, estudoId, criterioId, marcado);
+      });
     },
-    [protocoloId],
+    [protocoloId, gravarEmSegundoPlano],
   );
 
   const estudoAtual = estudos[indiceAtual];
@@ -234,16 +243,25 @@ export default function PainelDeTriagem({
         atualizadas.delete(estudoAtual.id);
         return atualizadas.set(estudoAtual.id, { decisao, criterioId });
       });
-      void registrarDecisao({
-        protocoloId,
-        estudoId: estudoAtual.id,
-        estagio,
-        decisao,
-        criterioId,
+      gravarEmSegundoPlano(async () => {
+        await registrarDecisao({
+          protocoloId,
+          estudoId: estudoAtual.id,
+          estagio,
+          decisao,
+          criterioId,
+        });
       });
       irParaProximoPendente(indiceAtual);
     },
-    [estudoAtual, protocoloId, estagio, indiceAtual, irParaProximoPendente],
+    [
+      estudoAtual,
+      protocoloId,
+      estagio,
+      indiceAtual,
+      irParaProximoPendente,
+      gravarEmSegundoPlano,
+    ],
   );
 
   const pedirRemocao = useCallback(
@@ -253,7 +271,7 @@ export default function PainelDeTriagem({
     [decisoes],
   );
 
-  const confirmarRemocao = useCallback(() => {
+  const confirmarRemocao = useCallback(async () => {
     const estudoId = remocaoPendente;
     if (estudoId === null) return;
 
@@ -262,7 +280,7 @@ export default function PainelDeTriagem({
       atualizadas.delete(estudoId);
       return atualizadas;
     });
-    void desfazerDecisao(protocoloId, estudoId, estagio);
+    await desfazerDecisao(protocoloId, estudoId, estagio);
     setRemocaoPendente(null);
   }, [remocaoPendente, protocoloId, estagio]);
 
@@ -278,11 +296,11 @@ export default function PainelDeTriagem({
     if (decisoes.size === 0) setIndiceAtual(0);
   }, [decisoes.size]);
 
-  const confirmarDescarte = useCallback(() => {
+  const confirmarDescarte = useCallback(async () => {
     const estudoId = descartePendente;
     if (estudoId === null) return;
 
-    void descartarArtigo(protocoloId, estudoId);
+    await descartarArtigo(protocoloId, estudoId);
     setDescartePendente(null);
   }, [descartePendente, protocoloId]);
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { Girando } from "@/app/componentes/Carregamento";
 import type { CriterioEditavel, TipoDeCriterio } from "@/lib/protocolo";
 import { salvarProtocolo, type ResultadoDaEdicao } from "./acoes";
 
@@ -199,7 +200,8 @@ export default function EditorDoProtocolo({
 
       <div className="linha-acoes">
         <button type="submit" className="botao botao-primario" disabled={enviando}>
-          {enviando ? "Salvando..." : "Salvar protocolo"}
+          {enviando && <Girando />}
+          {enviando ? "Salvando…" : "Salvar protocolo"}
         </button>
         {resultado.estado === "sucesso" && (
           <span className="subtitulo" style={{ alignSelf: "center" }}>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { Girando, useAcao } from "@/app/componentes/Carregamento";
 import { formatarAutores } from "@/lib/bibtex/autores";
 import { ehCampoObrigatorio } from "@/lib/campos";
 import type { CampoDeExtracao, EstudoParaExtracao } from "@/lib/extracao";
@@ -63,6 +64,12 @@ export default function PainelDeExtracao({
     [protocoloId],
   );
 
+  // Criar e remover coluna mexem na tabela inteira e a tela só muda quando a
+  // resposta chega. Um clique repetido aqui criaria coluna duplicada ou
+  // tentaria remover o que já foi removido, então o botão sai de cena
+  // enquanto a ação corre.
+  const [alterandoColunas, alterarColunas] = useAcao();
+
   if (campos.length === 0) {
     return (
       <div className="cartao vazio">
@@ -75,9 +82,15 @@ export default function PainelDeExtracao({
         <button
           type="button"
           className="botao botao-primario"
-          onClick={() => void usarCamposPadrao(protocoloId)}
+          disabled={alterandoColunas}
+          onClick={() =>
+            alterarColunas(async () => {
+              await usarCamposPadrao(protocoloId);
+            })
+          }
         >
-          Criar as colunas padrão
+          {alterandoColunas && <Girando />}
+          {alterandoColunas ? "Criando…" : "Criar as colunas padrão"}
         </button>
       </div>
     );
@@ -263,7 +276,12 @@ export default function PainelDeExtracao({
                   type="button"
                   className="botao-retirar"
                   title="Remover coluna e todos os valores preenchidos nela"
-                  onClick={() => void excluirCampo(protocoloId, campo.id)}
+                  disabled={alterandoColunas}
+                  onClick={() =>
+                    alterarColunas(async () => {
+                      await excluirCampo(protocoloId, campo.id);
+                    })
+                  }
                 >
                   ×
                 </button>
@@ -282,13 +300,17 @@ export default function PainelDeExtracao({
           <button
             type="button"
             className="botao"
-            disabled={nomeDoNovoCampo.trim() === ""}
+            disabled={nomeDoNovoCampo.trim() === "" || alterandoColunas}
             onClick={() => {
-              void criarCampo(protocoloId, nomeDoNovoCampo, "texto", null);
+              const nome = nomeDoNovoCampo;
               setNomeDoNovoCampo("");
+              alterarColunas(async () => {
+                await criarCampo(protocoloId, nome, "texto", null);
+              });
             }}
           >
-            Adicionar coluna
+            {alterandoColunas && <Girando />}
+            {alterandoColunas ? "Adicionando…" : "Adicionar coluna"}
           </button>
         </div>
       </section>
