@@ -26,11 +26,15 @@ const conexoesPorProcesso = globalThis as unknown as {
   conexaoPostgres?: ReturnType<typeof postgres>;
 };
 
-const CONEXOES_SIMULTANEAS = process.env.VERCEL ? 1 : 5;
+const CONEXOES_SIMULTANEAS = 5;
+const SEGUNDOS_OCIOSO_ATE_FECHAR = 20;
 
 const conexao =
   conexoesPorProcesso.conexaoPostgres ??
-  postgres(urlDoBanco(), { max: CONEXOES_SIMULTANEAS });
+  postgres(urlDoBanco(), {
+    max: CONEXOES_SIMULTANEAS,
+    idle_timeout: SEGUNDOS_OCIOSO_ATE_FECHAR,
+  });
 
 if (process.env.NODE_ENV !== "production") {
   conexoesPorProcesso.conexaoPostgres = conexao;
