@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import {
   buscarProtocolo,
   listarCriteriosDeExclusao,
-  listarCriteriosDeInclusao,
   listarEstudosParaEstagio,
   ROTULO_DO_ESTAGIO,
   TRIAGEM_INICIAL,
@@ -47,7 +46,7 @@ export default async function PaginaDeTriagem({
           estagio={TRIAGEM_INICIAL}
           estudos={listarEstudosParaEstagio(id, TRIAGEM_INICIAL)}
           criterios={criterios}
-          criteriosDeInclusao={listarCriteriosDeInclusao(id)}
+          criteriosDeInclusao={[]}
         />
       )}
     </>

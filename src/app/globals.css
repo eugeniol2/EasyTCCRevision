@@ -48,6 +48,19 @@ a {
   color: var(--destaque);
 }
 
+:focus-visible {
+  outline: 2px solid var(--destaque);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
+  border-color: var(--destaque);
+}
+
 .container {
   max-width: 60rem;
   margin: 0 auto;
@@ -189,6 +202,23 @@ textarea {
 .filtro:disabled {
   opacity: 0.45;
   cursor: default;
+}
+
+.lista-grupo-topo {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.lista-grupo-topo h2 {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.lista-grupo-topo .subtitulo {
+  font-weight: 400;
 }
 
 .lista-grupo {
@@ -625,6 +655,26 @@ textarea {
 .alvo .lista-limpa {
   gap: 0.25rem;
   font-size: 0.875rem;
+}
+
+.checagem {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--texto);
+  font-weight: 400;
+  cursor: pointer;
+  line-height: 1.45;
+}
+
+.checagem input {
+  width: auto;
+  margin: 0.2rem 0 0;
+  accent-color: var(--incluir);
+  flex-shrink: 0;
+  cursor: pointer;
 }
 
 .alvo-titulo {

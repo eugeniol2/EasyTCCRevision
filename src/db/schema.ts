@@ -151,6 +151,21 @@ export const triagem = sqliteTable(
   }),
 );
 
+export const atendimento = sqliteTable(
+  "atendimento",
+  {
+    estudoId: text("estudo_id")
+      .notNull()
+      .references(() => estudo.id, { onDelete: "cascade" }),
+    criterioId: text("criterio_id")
+      .notNull()
+      .references(() => criterio.id, { onDelete: "cascade" }),
+  },
+  (tabela) => ({
+    chave: primaryKey({ columns: [tabela.estudoId, tabela.criterioId] }),
+  }),
+);
+
 export const campoExtracao = sqliteTable(
   "campo_extracao",
   {

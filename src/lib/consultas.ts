@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/sqlite-core";
 import { db } from "@/db/client";
 import { busca, criterio, estudo, estudoBusca, protocolo, triagem } from "@/db/schema";
+import { agruparAtendimentosPorEstudo } from "@/lib/atendimento";
 
 export type EstagioDeTriagem = "titulo_resumo" | "texto_completo";
 
@@ -30,6 +31,7 @@ export interface EstudoParaTriagem {
   decisao: Decisao | null;
   criterioId: string | null;
   bases: string[];
+  criteriosAtendidos: string[];
 }
 
 export interface CriterioDoProtocolo {
@@ -115,6 +117,7 @@ export function listarEstudosParaEstagio(
   estagio: EstagioDeTriagem,
 ): EstudoParaTriagem[] {
   const basesPorEstudo = agruparBasesPorEstudo(protocoloId);
+  const atendidosPorEstudo = agruparAtendimentosPorEstudo(protocoloId);
 
   const linhas = db
     .select({
@@ -145,6 +148,7 @@ export function listarEstudosParaEstagio(
   return linhas.map((linha) => ({
     ...linha,
     bases: basesPorEstudo.get(linha.id) ?? [],
+    criteriosAtendidos: atendidosPorEstudo.get(linha.id) ?? [],
   }));
 }
 

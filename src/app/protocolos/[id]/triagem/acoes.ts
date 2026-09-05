@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { descartarEstudo } from "@/lib/estudos";
 import type { Decisao, EstagioDeTriagem } from "@/lib/consultas";
+import { desmarcarAtendimento, marcarAtendimento } from "@/lib/atendimento";
 import { removerDecisao, salvarDecisao } from "@/lib/triagem";
 
 interface DecisaoRecebida {
@@ -44,5 +45,17 @@ export async function descartarArtigo(
   estudoId: string,
 ): Promise<void> {
   descartarEstudo(estudoId);
+  revalidarTriagem(protocoloId);
+}
+
+export async function alternarAtendimento(
+  protocoloId: string,
+  estudoId: string,
+  criterioId: string,
+  atendido: boolean,
+): Promise<void> {
+  if (atendido) marcarAtendimento(estudoId, criterioId);
+  else desmarcarAtendimento(estudoId, criterioId);
+
   revalidarTriagem(protocoloId);
 }

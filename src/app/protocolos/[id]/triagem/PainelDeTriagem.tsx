@@ -10,7 +10,12 @@ import type {
   EstagioDeTriagem,
   EstudoParaTriagem,
 } from "@/lib/consultas";
-import { descartarArtigo, desfazerDecisao, registrarDecisao } from "./acoes";
+import {
+  alternarAtendimento,
+  descartarArtigo,
+  desfazerDecisao,
+  registrarDecisao,
+} from "./acoes";
 
 const TECLA_INCLUIR = "i";
 const TECLA_DUVIDA = "d";
@@ -122,6 +127,27 @@ export default function PainelDeTriagem({
   const [filtro, setFiltro] = useState<Filtro>("decididos");
   const [remocaoPendente, setRemocaoPendente] = useState<string | null>(null);
   const [descartePendente, setDescartePendente] = useState<string | null>(null);
+  const [atendidos, setAtendidos] = useState<Map<string, Set<string>>>(
+    () =>
+      new Map(
+        estudos.map((item) => [item.id, new Set(item.criteriosAtendidos)]),
+      ),
+  );
+
+  const alternarCriterio = useCallback(
+    (estudoId: string, criterioId: string, marcado: boolean) => {
+      setAtendidos((anteriores) => {
+        const atualizados = new Map(anteriores);
+        const doEstudo = new Set(atualizados.get(estudoId) ?? []);
+        if (marcado) doEstudo.add(criterioId);
+        else doEstudo.delete(criterioId);
+        atualizados.set(estudoId, doEstudo);
+        return atualizados;
+      });
+      void alternarAtendimento(protocoloId, estudoId, criterioId, marcado);
+    },
+    [protocoloId],
+  );
 
   const estudoAtual = estudos[indiceAtual];
 
@@ -495,6 +521,10 @@ export default function PainelDeTriagem({
           }
           criterios={criterios}
           criteriosDeInclusao={criteriosDeInclusao}
+          atendidos={atendidos.get(estudoAtual.id) ?? new Set()}
+          onAlternarCriterio={(criterioId, marcado) =>
+            alternarCriterio(estudoAtual.id, criterioId, marcado)
+          }
           onDecidir={decidir}
           onDesfazer={desfazerAtual}
           onDescartar={() => setDescartePendente(estudoAtual.id)}
@@ -510,6 +540,8 @@ interface PropsDoArtigo {
   criterioAplicado: string | undefined;
   criterios: CriterioDoProtocolo[];
   criteriosDeInclusao: CriterioDoProtocolo[];
+  atendidos: Set<string>;
+  onAlternarCriterio: (criterioId: string, marcado: boolean) => void;
   onDecidir: (decisao: Decisao, criterioId: string | null) => void;
   onDesfazer: () => void;
   onDescartar: () => void;
@@ -521,6 +553,8 @@ function ArtigoEmTriagem({
   criterioAplicado,
   criterios,
   criteriosDeInclusao,
+  atendidos,
+  onAlternarCriterio,
   onDecidir,
   onDesfazer,
   onDescartar,
@@ -584,11 +618,26 @@ function ArtigoEmTriagem({
 
       {criteriosDeInclusao.length > 0 && (
         <div className="alvo">
-          <p className="alvo-titulo">Para incluir, o estudo precisa atender a todos:</p>
+          <p className="alvo-titulo">
+            Critérios de inclusão — marque conforme confirma no texto (
+            {atendidos.size}/{criteriosDeInclusao.length})
+          </p>
           <ul className="lista-limpa">
             {criteriosDeInclusao.map((criterioDeInclusao) => (
               <li key={criterioDeInclusao.id}>
-                <strong>{criterioDeInclusao.codigo}</strong> — {criterioDeInclusao.descricao}
+                <label className="checagem">
+                  <input
+                    type="checkbox"
+                    checked={atendidos.has(criterioDeInclusao.id)}
+                    onChange={(evento) =>
+                      onAlternarCriterio(criterioDeInclusao.id, evento.target.checked)
+                    }
+                  />
+                  <span>
+                    <strong>{criterioDeInclusao.codigo}</strong> —{" "}
+                    {criterioDeInclusao.descricao}
+                  </span>
+                </label>
               </li>
             ))}
           </ul>

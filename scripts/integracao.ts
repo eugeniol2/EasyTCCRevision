@@ -92,6 +92,11 @@ const {
   tabelaEmLatex,
   textoDaMetodologia,
 } = await import("../src/lib/relatorio");
+const {
+  agruparAtendimentosPorEstudo,
+  desmarcarAtendimento,
+  marcarAtendimento,
+} = await import("../src/lib/atendimento");
 const { busca, estudo, triagem } = await import("../src/db/schema");
 
 const ARTIGOS_DA_SCOPUS = String.raw`
@@ -625,6 +630,49 @@ const metodologia = textoDaMetodologia(protocoloId);
 checar("metodologia cita os incluidos", metodologia.includes(`${prisma.incluidos} estudo(s) compuseram`), true);
 checar("metodologia cita as bases", metodologia.includes("base(s) de dados"), true);
 
+
+console.log("");
+console.log("Checklist de inclusao");
+const criteriosParaChecar = listarCriteriosDeInclusao(protocoloId);
+checar("ha criterio de inclusao", criteriosParaChecar.length > 0, true);
+
+const paraChecar = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+const estudoChecado = paraChecar[0]!;
+
+checar("comeca sem nada marcado", estudoChecado.criteriosAtendidos.length, 0);
+
+marcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
+checar(
+  "marcacao e persistida",
+  agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id),
+  [criteriosParaChecar[0]!.id],
+);
+checar(
+  "marcacao aparece na listagem",
+  listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL)
+    .find((e) => e.id === estudoChecado.id)!.criteriosAtendidos.length,
+  1,
+);
+
+marcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
+checar(
+  "marcar duas vezes nao duplica",
+  agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id)!.length,
+  1,
+);
+
+checar(
+  "outro estudo nao e afetado",
+  agruparAtendimentosPorEstudo(protocoloId).get(paraChecar[1]!.id) ?? [],
+  [],
+);
+
+desmarcarAtendimento(estudoChecado.id, criteriosParaChecar[0]!.id);
+checar(
+  "desmarcar remove",
+  agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id) ?? [],
+  [],
+);
 
 console.log(
   `\n${verificacoesQuePassaram} passaram, ${verificacoesQueFalharam} falharam`,
