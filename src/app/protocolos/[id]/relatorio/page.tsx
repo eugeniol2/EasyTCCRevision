@@ -37,23 +37,35 @@ export default async function PaginaDeRelatorio({
 
   return (
     <>
+      <a className="voltar" href={`/protocolos/${id}`}>
+        ← Voltar ao protocolo
+      </a>
+
       <header className="cabecalho">
         <div>
           <h1>Síntese</h1>
           <p className="subtitulo">
-            Os números e os textos prontos para o capítulo de metodologia.
+            O fluxo PRISMA e os textos prontos para colar no seu capítulo de
+            metodologia.
           </p>
         </div>
-        <a className="botao" href={`/protocolos/${id}`}>
-          Voltar
-        </a>
       </header>
 
       {pendencias > 0 && (
-        <div className="aviso">
-          Há {pendencias} estudo(s) ainda sem decisão. Os números abaixo mudam
-          conforme você termina a triagem.
-        </div>
+        <a
+          className="aviso aviso-clicavel"
+          href={`/protocolos/${id}/${
+            prisma.pendentesNaTriagem > 0 ? "triagem" : "leitura"
+          }`}
+        >
+          <strong>
+            {`Há ${pendencias} estudo(s) ainda sem decisão na fase ${
+              prisma.pendentesNaTriagem > 0 ? 1 : 2
+            }.`}
+          </strong>{" "}
+          Os números abaixo mudam conforme você termina. Clique para continuar de
+          onde parou. →
+        </a>
       )}
 
       <section className="cartao">
@@ -124,6 +136,7 @@ export default async function PaginaDeRelatorio({
       />
 
       <TabelaDeTrabalhos
+        protocoloId={id}
         tituloDaRevisao={protocolo.titulo}
         tabela={montarTabelaDeTrabalhos(id)}
         latex={tabelaEmLatex(id, protocolo.titulo)}

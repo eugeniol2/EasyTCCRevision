@@ -2,13 +2,34 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { estudo, triagem } from "@/db/schema";
-import { TRIAGEM_INICIAL, type Decisao, type EstagioDeTriagem } from "@/lib/consultas";
+import {
+  LEITURA_COMPLETA,
+  TRIAGEM_INICIAL,
+  type Decisao,
+  type EstagioDeTriagem,
+} from "@/lib/consultas";
 
 export interface DecisaoDeTriagem {
   estudoId: string;
   estagio: EstagioDeTriagem;
   decisao: Decisao;
   criterioId: string | null;
+}
+
+/**
+ * A decisão de leitura só faz sentido enquanto o estudo está no funil.
+ * Quando a fase 1 deixa de incluí-lo, a linha da fase 2 vira órfã: some da
+ * contagem, mas reapareceria intacta se o estudo fosse reincluído depois.
+ */
+function limparDecisaoDeLeitura(estudoId: string): void {
+  db.delete(triagem)
+    .where(
+      and(
+        eq(triagem.estudoId, estudoId),
+        eq(triagem.estagio, LEITURA_COMPLETA),
+      ),
+    )
+    .run();
 }
 
 export function salvarDecisao({
@@ -36,6 +57,9 @@ export function salvarDecisao({
       },
     })
     .run();
+
+  const saiuDoFunil = estagio === TRIAGEM_INICIAL && decisao !== "incluido";
+  if (saiuDoFunil) limparDecisaoDeLeitura(estudoId);
 }
 
 export function removerDecisao(
@@ -45,6 +69,8 @@ export function removerDecisao(
   db.delete(triagem)
     .where(and(eq(triagem.estudoId, estudoId), eq(triagem.estagio, estagio)))
     .run();
+
+  if (estagio === TRIAGEM_INICIAL) limparDecisaoDeLeitura(estudoId);
 }
 
 export function removerTodasAsDecisoes(protocoloId: string): number {

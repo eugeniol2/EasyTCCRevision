@@ -303,6 +303,10 @@ textarea {
   margin-bottom: 1rem;
 }
 
+.posicao > span {
+  white-space: nowrap;
+}
+
 .posicao {
   font-size: 0.85rem;
   color: var(--texto-suave);
@@ -689,6 +693,229 @@ textarea {
   margin-top: 1.25rem;
 }
 
+.tela-cheia {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  padding: 0 1.5rem;
+}
+
+.controles-tabela {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+}
+
+.dica-tabela {
+  margin: 0 0 0 auto;
+  font-size: 0.78rem;
+  max-width: 34rem;
+  text-align: right;
+}
+
+.area-tabela {
+  resize: both;
+  overflow: auto;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie);
+  width: 100%;
+  height: 70vh;
+  min-height: 14rem;
+  min-width: 20rem;
+}
+
+.tabela-exploravel {
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.tabela-exploravel th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--superficie);
+  border-bottom: 1px solid var(--borda);
+  padding: 0.7rem 0.75rem;
+  overflow: visible;
+}
+
+.tabela-exploravel td {
+  padding: 0.6rem 0.75rem;
+  border-bottom: 1px solid var(--borda);
+  border-right: 1px solid var(--borda);
+  vertical-align: top;
+}
+
+.tabela-exploravel th {
+  border-right: 1px solid var(--borda);
+}
+
+.tabela-exploravel th:last-child,
+.tabela-exploravel td:last-child {
+  border-right: none;
+}
+
+.linha-exploravel {
+  cursor: pointer;
+}
+
+.linha-exploravel:hover td {
+  background: var(--duvida-fundo);
+}
+
+.linha-expandida td {
+  background: var(--superficie);
+  border-bottom-width: 2px;
+}
+
+.marca-expansao {
+  color: var(--texto-suave);
+  font-size: 0.7rem;
+  margin-right: 0.35rem;
+  user-select: none;
+}
+
+.celula-compacta,
+.celula-inteira {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  display: inline;
+}
+
+.celula-compacta {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.linha-exploravel td:first-child .celula-compacta,
+.linha-exploravel td:first-child .celula-inteira {
+  display: inline;
+}
+
+.alca-coluna {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.alca-coluna:hover {
+  background: var(--destaque);
+  opacity: 0.5;
+}
+
+body.redimensionando {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.voltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  color: var(--texto-suave);
+  text-decoration: none;
+  margin-bottom: 1rem;
+  padding: 0.3rem 0.6rem;
+  margin-left: -0.6rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+}
+
+.voltar:hover {
+  color: var(--texto);
+  background: var(--superficie);
+  border-color: var(--borda);
+}
+
+.voltar-destacado {
+  background: var(--destaque);
+  border-color: var(--destaque);
+  color: #fff;
+  font-weight: 500;
+}
+
+.voltar-destacado:hover {
+  background: var(--destaque);
+  border-color: var(--destaque);
+  color: #fff;
+  opacity: 0.9;
+}
+
+.aviso-clicavel {
+  display: block;
+  color: var(--texto);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.aviso-clicavel:hover {
+  border-color: var(--destaque);
+  border-left-color: var(--duvida);
+  text-decoration: none;
+}
+
+.cartao-alerta {
+  border-color: var(--duvida);
+  box-shadow: inset 3px 0 0 var(--duvida);
+}
+
+.botao-bloqueado {
+  opacity: 0.45;
+  cursor: not-allowed;
+  font-size: 0.85rem;
+}
+
+.marca-criterio {
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--excluir);
+  background: var(--excluir-fundo);
+  border-radius: 5px;
+  padding: 0.1rem 0.4rem;
+  flex-shrink: 0;
+}
+
+.texto-criterio {
+  flex: 1;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--borda) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--borda);
+  border-radius: 999px;
+  border: 2px solid var(--superficie);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--texto-suave);
+}
+
 .criterio {
   display: flex;
   align-items: baseline;
@@ -704,8 +931,20 @@ textarea {
   width: 100%;
 }
 
-.criterio:hover {
+.criterio {
+  border: 1px solid transparent;
+}
+
+.criterio:disabled {
+  opacity: 0.5;
+  cursor: default;
   background: var(--excluir-fundo);
+  border-color: var(--excluir);
+}
+
+.criterio:hover:not(:disabled) {
+  background: var(--excluir-fundo);
+  border-color: var(--excluir);
 }
 
 kbd {

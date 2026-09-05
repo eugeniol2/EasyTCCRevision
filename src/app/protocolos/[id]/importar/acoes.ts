@@ -1,8 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { importarParaOProtocolo } from "@/lib/importacao";
-import { resultadoComErro, type ResultadoDaImportacao } from "./resultado";
+import { encontrarBuscaIdentica, importarParaOProtocolo } from "@/lib/importacao";
+import {
+  RESULTADO_INICIAL,
+  resultadoComErro,
+  type ResultadoDaImportacao,
+} from "./resultado";
 
 function textoDoCampo(formData: FormData, nome: string): string {
   const valor = formData.get(nome);
@@ -28,12 +32,35 @@ export async function importarBibtex(
   if (!executadaEm) return resultadoComErro("Informe a data em que a busca foi executada.");
   if (!conteudo) return resultadoComErro("Escolha o arquivo exportado ou cole o conteúdo.");
 
+  const executadaEmSegundos = paraSegundosUnix(executadaEm);
+  const modo = textoDoCampo(formData, "modo");
+  const identica = encontrarBuscaIdentica(
+    protocoloId,
+    base,
+    stringBusca,
+    executadaEmSegundos,
+  );
+
+  if (identica && modo === "") {
+    return {
+      ...RESULTADO_INICIAL,
+      estado: "conflito",
+      mensagem: "Esta busca já foi registrada.",
+      conflito: {
+        base: identica.base,
+        dataFormatada: new Date(identica.executadaEm * 1000).toLocaleDateString("pt-BR"),
+        registrosJaVinculados: identica.registrosJaVinculados,
+      },
+    };
+  }
+
   const resumo = importarParaOProtocolo({
     protocoloId,
     base,
     stringBusca,
-    executadaEmSegundos: paraSegundosUnix(executadaEm),
+    executadaEmSegundos,
     conteudo,
+    anexarABusca: modo === "anexar" ? (identica?.id ?? null) : null,
   });
 
   if (resumo.entradasLidas === 0) {
@@ -53,5 +80,6 @@ export async function importarBibtex(
     jaExistiamNoProtocolo: resumo.jaExistiamNoProtocolo,
     suspeitas: resumo.suspeitas,
     linhasComErro: resumo.linhasComErro,
+    conflito: null,
   };
 }

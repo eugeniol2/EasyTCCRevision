@@ -23,28 +23,36 @@ export default async function PaginaDeLeitura({
 
   const estudos = listarEstudosParaEstagio(id, LEITURA_COMPLETA);
   const naTriagem = contarPorDecisao(id, TRIAGEM_INICIAL);
+  const concluida =
+    estudos.length > 0 && contarPorDecisao(id, LEITURA_COMPLETA).pendente === 0;
 
   return (
     <>
+      <a
+        className={`voltar${concluida ? " voltar-destacado" : ""}`}
+        href={`/protocolos/${id}`}
+      >
+        ← {concluida ? "Fase concluída — voltar ao protocolo" : "Voltar ao protocolo"}
+      </a>
+
       <header className="cabecalho">
         <div>
           <h1>Fase 2 — {ROTULO_DO_ESTAGIO[LEITURA_COMPLETA]}</h1>
           <p className="subtitulo">
-            Leia o artigo inteiro e confirme. Aqui você é rigoroso: é a decisão final.
+            Entram os estudos que você incluiu na fase 1. Abra e leia cada artigo,
+            marcando os critérios de inclusão conforme confirma no texto. Quem
+            atender a todos entra na revisão — esta é a decisão final.
           </p>
         </div>
-        <a className="botao" href={`/protocolos/${id}`}>
-          Voltar
-        </a>
       </header>
 
       {estudos.length === 0 ? (
         <div className="cartao vazio">
           <p>Nenhum estudo chegou a esta fase ainda.</p>
           <p className="subtitulo">
-            Só entram aqui os incluídos na triagem por título e resumo — hoje{" "}
+            Só chegam aqui os estudos que você incluiu na fase 1. Até agora são{" "}
             {naTriagem.incluido} de {naTriagem.total}, com {naTriagem.pendente}{" "}
-            ainda pendente(s).
+            ainda sem decisão.
           </p>
           <a className="botao" href={`/protocolos/${id}/triagem`}>
             Ir para a fase 1

@@ -110,15 +110,14 @@ export function montarPrisma(protocoloId: string): Prisma {
   };
 }
 
-function primeiroAutorEAno(
+function primeiroAutor(
   autores: { family?: string; given?: string; literal?: string }[],
-  ano: number | null,
 ): string {
   const primeiro = autores[0];
   const sobrenome =
     primeiro?.family ?? primeiro?.literal ?? primeiro?.given ?? "Autor desconhecido";
-  const demais = autores.length > 1 ? " et al." : "";
-  return `${sobrenome}${demais} (${ano ?? "s.d."})`;
+
+  return autores.length > 1 ? `${sobrenome} et al.` : sobrenome;
 }
 
 function escaparParaLatex(texto: string): string {
@@ -130,7 +129,7 @@ function escaparParaLatex(texto: string): string {
 }
 
 export interface LinhaDaTabela {
-  estudo: string;
+  autor: string;
   ano: string;
   celulas: string[];
 }
@@ -147,8 +146,8 @@ export function montarTabelaDeTrabalhos(protocoloId: string): TabelaDeTrabalhos 
   return {
     colunas: campos.map((campo) => campo.nome),
     linhas: estudos.map((item) => ({
-      estudo: primeiroAutorEAno(item.autores, item.ano),
-      ano: String(item.ano ?? "—"),
+      autor: primeiroAutor(item.autores),
+      ano: String(item.ano ?? "s.d."),
       celulas: campos.map((campo) => item.valores[campo.id] ?? "—"),
     })),
   };
@@ -182,12 +181,17 @@ export function tabelaEmLatex(protocoloId: string, tituloDaRevisao: string): str
 
   if (estudos.length === 0) return "";
 
-  const colunas = `l${"p{3cm}".repeat(campos.length)}`;
-  const cabecalho = ["\\textbf{Estudo}", ...campos.map((campo) => `\\textbf{${escaparParaLatex(campo.nome)}}`)];
+  const colunas = `ll${"p{3cm}".repeat(campos.length)}`;
+  const cabecalho = [
+    "\\textbf{Autor}",
+    "\\textbf{Ano}",
+    ...campos.map((campo) => `\\textbf{${escaparParaLatex(campo.nome)}}`),
+  ];
 
   const linhas = estudos.map((item) =>
     [
-      escaparParaLatex(primeiroAutorEAno(item.autores, item.ano)),
+      escaparParaLatex(primeiroAutor(item.autores)),
+      escaparParaLatex(String(item.ano ?? "s.d.")),
       ...campos.map((campo) => escaparParaLatex(item.valores[campo.id] ?? "—")),
     ].join(" & "),
   );

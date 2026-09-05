@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import {
   buscarProtocolo,
+  contarPorDecisao,
   listarCriteriosDeExclusao,
   listarEstudosParaEstagio,
   ROTULO_DO_ESTAGIO,
@@ -19,19 +20,27 @@ export default async function PaginaDeTriagem({
   if (!protocolo) notFound();
 
   const criterios = listarCriteriosDeExclusao(id);
+  const concluida =
+    contarPorDecisao(id, TRIAGEM_INICIAL).pendente === 0;
 
   return (
     <>
+      <a
+        className={`voltar${concluida ? " voltar-destacado" : ""}`}
+        href={`/protocolos/${id}`}
+      >
+        ← {concluida ? "Fase concluída — voltar ao protocolo" : "Voltar ao protocolo"}
+      </a>
+
       <header className="cabecalho">
         <div>
           <h1>Fase 1 — {ROTULO_DO_ESTAGIO[TRIAGEM_INICIAL]}</h1>
           <p className="subtitulo">
-            Decida pelo título e pelo resumo, sem abrir o artigo. Na dúvida, inclua.
+            Entram todos os estudos importados. Leia só o título e o resumo — não abra o
+            artigo ainda — e descarte o que claramente não serve. Na dúvida, inclua:
+            o que sobra você reavalia na fase 2, mas o que sai aqui não volta.
           </p>
         </div>
-        <a className="botao" href={`/protocolos/${id}`}>
-          Voltar
-        </a>
       </header>
 
       {criterios.length === 0 ? (

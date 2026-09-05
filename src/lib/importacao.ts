@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { busca, estudo, estudoBusca } from "@/db/schema";
 import type { EstudoImportado } from "@/lib/bibtex/paraEstudo";
@@ -12,6 +12,54 @@ export interface DadosDaImportacao {
   stringBusca: string;
   executadaEmSegundos: number;
   conteudo: string;
+  anexarABusca?: string | null;
+}
+
+export interface BuscaIdentica {
+  id: string;
+  base: string;
+  executadaEm: number;
+  registrosJaVinculados: number;
+}
+
+/**
+ * O Google Scholar exporta uma citação por vez, então a mesma busca acaba
+ * sendo importada em partes. Sem detectar isso, cada parte vira uma busca
+ * nova e o "identificados" do PRISMA infla a cada importação.
+ */
+export function encontrarBuscaIdentica(
+  protocoloId: string,
+  base: string,
+  stringBusca: string,
+  executadaEmSegundos: number,
+): BuscaIdentica | null {
+  const encontrada = db
+    .select()
+    .from(busca)
+    .where(
+      and(
+        eq(busca.protocoloId, protocoloId),
+        eq(busca.base, base),
+        eq(busca.stringBusca, stringBusca),
+        eq(busca.executadaEm, executadaEmSegundos),
+      ),
+    )
+    .get();
+
+  if (!encontrada) return null;
+
+  const vinculos = db
+    .select({ quantidade: sql<number>`count(*)` })
+    .from(estudoBusca)
+    .where(eq(estudoBusca.buscaId, encontrada.id))
+    .get();
+
+  return {
+    id: encontrada.id,
+    base: encontrada.base,
+    executadaEm: encontrada.executadaEm,
+    registrosJaVinculados: vinculos?.quantidade ?? 0,
+  };
 }
 
 export interface SuspeitaDeDuplicata {
@@ -79,22 +127,25 @@ export function importarParaOProtocolo(
   const { unicos, fundidos, suspeitas } = deduplicar(arquivoLido.estudos);
 
   const jaSalvos = listarJaSalvos(dados.protocoloId);
-  const buscaId = randomUUID();
+  const anexando = dados.anexarABusca ?? null;
+  const buscaId = anexando ?? randomUUID();
   let importados = 0;
   let jaExistiamNoProtocolo = 0;
 
   db.transaction((transacao) => {
-    transacao
-      .insert(busca)
-      .values({
-        id: buscaId,
-        protocoloId: dados.protocoloId,
-        base: dados.base,
-        stringBusca: dados.stringBusca,
-        executadaEm: dados.executadaEmSegundos,
-        totalResultados: arquivoLido.estudos.length,
-      })
-      .run();
+    if (!anexando) {
+      transacao
+        .insert(busca)
+        .values({
+          id: buscaId,
+          protocoloId: dados.protocoloId,
+          base: dados.base,
+          stringBusca: dados.stringBusca,
+          executadaEm: dados.executadaEmSegundos,
+          totalResultados: arquivoLido.estudos.length,
+        })
+        .run();
+    }
 
     for (const candidato of unicos) {
       const equivalente = encontrarEquivalenteSalvo(candidato, jaSalvos);
@@ -122,6 +173,20 @@ export function importarParaOProtocolo(
         tituloNorm: candidato.tituloNorm,
       });
       importados++;
+    }
+
+    if (anexando) {
+      const vinculados = transacao
+        .select({ quantidade: sql<number>`count(*)` })
+        .from(estudoBusca)
+        .where(eq(estudoBusca.buscaId, buscaId))
+        .get();
+
+      transacao
+        .update(busca)
+        .set({ totalResultados: vinculados?.quantidade ?? 0 })
+        .where(eq(busca.id, buscaId))
+        .run();
     }
   });
 

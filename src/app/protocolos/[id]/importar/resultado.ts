@@ -1,13 +1,20 @@
 import type { SuspeitaDeDuplicata } from "@/lib/importacao";
 
+export interface BuscaEmConflito {
+  base: string;
+  dataFormatada: string;
+  registrosJaVinculados: number;
+}
+
 export interface ResultadoDaImportacao {
-  estado: "inicial" | "sucesso" | "erro";
+  estado: "inicial" | "sucesso" | "erro" | "conflito";
   mensagem: string;
   importados: number;
   duplicatasNoArquivo: number;
   jaExistiamNoProtocolo: number;
   suspeitas: SuspeitaDeDuplicata[];
   linhasComErro: string[];
+  conflito: BuscaEmConflito | null;
 }
 
 export const RESULTADO_INICIAL: ResultadoDaImportacao = {
@@ -18,6 +25,7 @@ export const RESULTADO_INICIAL: ResultadoDaImportacao = {
   jaExistiamNoProtocolo: 0,
   suspeitas: [],
   linhasComErro: [],
+  conflito: null,
 };
 
 export function resultadoComErro(mensagem: string): ResultadoDaImportacao {

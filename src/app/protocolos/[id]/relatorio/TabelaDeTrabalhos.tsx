@@ -4,12 +4,14 @@ import { useState } from "react";
 import type { TabelaDeTrabalhos as Tabela } from "@/lib/relatorio";
 
 interface Props {
+  protocoloId: string;
   tituloDaRevisao: string;
   tabela: Tabela;
   latex: string;
 }
 
 export default function TabelaDeTrabalhos({
+  protocoloId,
   tituloDaRevisao,
   tabela,
   latex,
@@ -47,6 +49,9 @@ export default function TabelaDeTrabalhos({
           <button type="button" className="botao" onClick={() => window.print()}>
             Salvar como PDF
           </button>
+          <a className="botao" href={`/protocolos/${protocoloId}/tabela`}>
+            Visualizar online
+          </a>
           <button type="button" className="botao" onClick={() => void copiarLatex()}>
             {copiado ? "LaTeX copiado" : "Copiar LaTeX"}
           </button>
@@ -64,7 +69,8 @@ export default function TabelaDeTrabalhos({
         <table className="tabela tabela-trabalhos">
           <thead>
             <tr>
-              <th>Estudo</th>
+              <th>Autor</th>
+              <th>Ano</th>
               {tabela.colunas.map((coluna) => (
                 <th key={coluna}>{coluna}</th>
               ))}
@@ -72,8 +78,9 @@ export default function TabelaDeTrabalhos({
           </thead>
           <tbody>
             {tabela.linhas.map((linha) => (
-              <tr key={linha.estudo}>
-                <td style={{ whiteSpace: "nowrap" }}>{linha.estudo}</td>
+              <tr key={`${linha.autor}-${linha.ano}`}>
+                <td style={{ whiteSpace: "nowrap" }}>{linha.autor}</td>
+                <td>{linha.ano}</td>
                 {linha.celulas.map((celula, posicao) => (
                   <td key={tabela.colunas[posicao] ?? posicao}>{celula}</td>
                 ))}

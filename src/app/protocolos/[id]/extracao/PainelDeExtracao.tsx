@@ -2,14 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { formatarAutores } from "@/lib/bibtex/autores";
+import { ehCampoObrigatorio } from "@/lib/campos";
 import type { CampoDeExtracao, EstudoParaExtracao } from "@/lib/extracao";
-import {
-  criarAvaliacaoDeQualidade,
-  criarCampo,
-  excluirCampo,
-  salvarValor,
-  usarCamposPadrao,
-} from "./acoes";
+import { criarCampo, excluirCampo, salvarValor, usarCamposPadrao } from "./acoes";
 
 interface Props {
   protocoloId: string;
@@ -73,7 +68,8 @@ export default function PainelDeExtracao({
       <div className="cartao vazio">
         <p>Nenhuma coluna de extração definida.</p>
         <p className="subtitulo">
-          O padrão são objetivo, metodologia e resultados. Você pode acrescentar
+          As colunas da sua tabela de trabalhos relacionados: objetivo,
+          metodologia, resultados e qualidade metodológica. Dá para acrescentar
           outras depois.
         </p>
         <button
@@ -81,7 +77,7 @@ export default function PainelDeExtracao({
           className="botao botao-primario"
           onClick={() => void usarCamposPadrao(protocoloId)}
         >
-          Criar as três colunas padrão
+          Criar as colunas padrão
         </button>
       </div>
     );
@@ -162,9 +158,12 @@ export default function PainelDeExtracao({
         >
           ← Anterior
         </button>
-        <span className="posicao">
-          Estudo <strong>{indiceAtual + 1}</strong> de <strong>{estudos.length}</strong>
-        </span>
+        <div className="posicao">
+          <span>
+            Estudo <strong>{indiceAtual + 1}</strong> de{" "}
+            <strong>{estudos.length}</strong>
+          </span>
+        </div>
         <button
           type="button"
           className="botao"
@@ -257,14 +256,18 @@ export default function PainelDeExtracao({
                   <span className="uso-criterio"> {campo.opcoes.join(" · ")}</span>
                 )}
               </span>
-              <button
-                type="button"
-                className="botao-retirar"
-                title="Remover coluna e todos os valores preenchidos nela"
-                onClick={() => void excluirCampo(protocoloId, campo.id)}
-              >
-                ×
-              </button>
+              {ehCampoObrigatorio(campo.nome) ? (
+                <span className="uso-criterio">obrigatória</span>
+              ) : (
+                <button
+                  type="button"
+                  className="botao-retirar"
+                  title="Remover coluna e todos os valores preenchidos nela"
+                  onClick={() => void excluirCampo(protocoloId, campo.id)}
+                >
+                  ×
+                </button>
+              )}
             </div>
           ))}
         </div>
@@ -287,15 +290,6 @@ export default function PainelDeExtracao({
           >
             Adicionar coluna
           </button>
-          {!campos.some((campo) => campo.tipo === "opcoes") && (
-            <button
-              type="button"
-              className="botao"
-              onClick={() => void criarAvaliacaoDeQualidade(protocoloId)}
-            >
-              Adicionar avaliação de qualidade
-            </button>
-          )}
         </div>
       </section>
     </>

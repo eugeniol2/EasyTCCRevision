@@ -69,7 +69,8 @@ const {
   listarEstudosParaEstagio,
   TRIAGEM_INICIAL,
 } = await import("../src/lib/consultas");
-const { importarParaOProtocolo } = await import("../src/lib/importacao");
+const { encontrarBuscaIdentica, importarParaOProtocolo } =
+  await import("../src/lib/importacao");
 const { removerDecisao, removerTodasAsDecisoes, salvarDecisao } =
   await import("../src/lib/triagem");
 const { descartarEstudo, descartarTudoDoProtocolo } =
@@ -524,11 +525,21 @@ checar("so o incluido na fase 2 entra", paraExtrair.length, 1);
 checar("autor ja vem preenchido", paraExtrair[0]!.autores.length > 0, true);
 checar("ano ja vem preenchido", typeof paraExtrair[0]!.ano, "number");
 
-checar("cria as tres colunas padrao", criarCamposPadrao(protocoloId), 3);
+checar("cria as colunas padrao", criarCamposPadrao(protocoloId), 4);
 checar("nao recria se ja existem", criarCamposPadrao(protocoloId), 0);
 
 const camposCriados = listarCampos(protocoloId);
-checar("nomes das colunas", camposCriados.map((c) => c.nome), ["Objetivo", "Metodologia", "Resultados"]);
+checar("nomes das colunas", camposCriados.map((c) => c.nome), [
+  "Objetivo",
+  "Metodologia",
+  "Resultados",
+  "Qualidade metodológica",
+]);
+checar(
+  "qualidade vem com escala de opcoes",
+  camposCriados[3]!.opcoes,
+  ["Alta", "Média", "Baixa"],
+);
 
 const alvoDaExtracao = paraExtrair[0]!;
 salvarValorExtraido(alvoDaExtracao.id, camposCriados[0]!.id, "Detectar anomalias");
@@ -563,10 +574,10 @@ for (const campo of camposCriados) {
 }
 const progresso = medirProgresso(protocoloId);
 checar("estudo completo e contado", progresso.completos, 1);
-checar("total de colunas no progresso", progresso.campos, 3);
+checar("total de colunas no progresso", progresso.campos, 4);
 
 const novaColuna = adicionarCampo(protocoloId, "Risco de vies", "opcoes", ["alto", "baixo"]);
-checar("coluna adicionada", listarCampos(protocoloId).length, 4);
+checar("coluna adicionada", listarCampos(protocoloId).length, 5);
 checar(
   "estudo deixa de estar completo com coluna nova",
   medirProgresso(protocoloId).completos,
@@ -577,11 +588,11 @@ salvarValorExtraido(alvoDaExtracao.id, novaColuna, "baixo");
 checar("completo de novo apos preencher", medirProgresso(protocoloId).completos, 1);
 
 checar("remover coluna", removerCampo(novaColuna), 1);
-checar("colunas restantes", listarCampos(protocoloId).length, 3);
+checar("colunas restantes", listarCampos(protocoloId).length, 4);
 checar(
   "valores da coluna removida somem junto",
   listarEstudosParaExtracao(protocoloId)[0]!.camposPreenchidos,
-  3,
+  4,
 );
 
 console.log("");
@@ -604,7 +615,12 @@ checar(
 checar("buscas listadas", prisma.buscas.length > 0, true);
 
 const tabela = montarTabelaDeTrabalhos(protocoloId);
-checar("colunas da tabela", tabela.colunas, ["Objetivo", "Metodologia", "Resultados"]);
+checar("colunas da tabela", tabela.colunas, [
+  "Objetivo",
+  "Metodologia",
+  "Resultados",
+  "Qualidade metodológica",
+]);
 checar(
   "uma linha por estudo incluido",
   tabela.linhas.length,
@@ -613,6 +629,22 @@ checar(
 checar(
   "cada linha tem uma celula por coluna",
   tabela.linhas.every((l) => l.celulas.length === tabela.colunas.length),
+  true,
+);
+checar(
+  "autor sem o ano embutido",
+  tabela.linhas.every((l) => !l.autor.includes("(")),
+  true,
+);
+checar("ano em coluna propria", /^\d{4}$|^s\.d\.$/.test(tabela.linhas[0]!.ano), true);
+checar(
+  "latex declara duas colunas simples antes das de texto",
+  tabelaEmLatex(protocoloId, "T").includes(String.raw`\begin{tabular}{ll`),
+  true,
+);
+checar(
+  "latex tem cabecalho de autor e ano",
+  tabelaEmLatex(protocoloId, "T").includes(String.raw`\textbf{Autor} & \textbf{Ano}`),
   true,
 );
 
@@ -672,6 +704,102 @@ checar(
   "desmarcar remove",
   agruparAtendimentosPorEstudo(protocoloId).get(estudoChecado.id) ?? [],
   [],
+);
+
+console.log("");
+console.log("Funil da fase 1 ate a extracao");
+removerTodasAsDecisoes(protocoloId);
+const noFunil = listarEstudosParaEstagio(protocoloId, TRIAGEM_INICIAL);
+
+noFunil.slice(0, 3).forEach((e) =>
+  salvarDecisao({ estagio: TRIAGEM_INICIAL, estudoId: e.id, decisao: "incluido", criterioId: null }),
+);
+listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA).forEach((e) =>
+  salvarDecisao({ estagio: LEITURA_COMPLETA, estudoId: e.id, decisao: "incluido", criterioId: null }),
+);
+checar("tres chegam a extracao", listarEstudosParaExtracao(protocoloId).length, 3);
+
+salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
+  estudoId: noFunil[0]!.id,
+  decisao: "excluido",
+  criterioId: null,
+});
+checar("excluir na fase 1 tira da extracao", listarEstudosParaExtracao(protocoloId).length, 2);
+checar(
+  "e apaga a decisao de leitura, sem deixar orfao",
+  db.select().from(triagem).all()
+    .filter((t) => t.estudoId === noFunil[0]!.id && t.estagio === "texto_completo").length,
+  0,
+);
+
+salvarDecisao({
+  estagio: TRIAGEM_INICIAL,
+  estudoId: noFunil[0]!.id,
+  decisao: "incluido",
+  criterioId: null,
+});
+checar(
+  "reincluir na fase 1 devolve como pendente na fase 2",
+  listarEstudosParaEstagio(protocoloId, LEITURA_COMPLETA)
+    .find((e) => e.id === noFunil[0]!.id)!.decisao,
+  null,
+);
+checar("e nao volta direto para a extracao", listarEstudosParaExtracao(protocoloId).length, 2);
+
+removerDecisao(noFunil[1]!.id, TRIAGEM_INICIAL);
+checar("limpar decisao da fase 1 tambem limpa a fase 2", listarEstudosParaExtracao(protocoloId).length, 1);
+
+console.log("");
+console.log("Busca repetida");
+const protocoloDaBusca = randomUUID();
+db.insert(protocolo)
+  .values({ id: protocoloDaBusca, titulo: "Busca repetida", anoInicio: 2020, anoFim: 2026 })
+  .run();
+
+const artigo = (n: number) =>
+  String.raw`@article{r${n}, author={Silva, J.}, title={Artigo ${n}}, year={2024}, doi={10.1109/tse.2024.${n}}}`;
+const dadosDaBusca = {
+  protocoloId: protocoloDaBusca,
+  base: "Google Scholar",
+  stringBusca: "mesma string",
+  executadaEmSegundos: 1000,
+};
+
+checar(
+  "nao ha busca identica antes da primeira",
+  encontrarBuscaIdentica(protocoloDaBusca, "Google Scholar", "mesma string", 1000),
+  null,
+);
+
+importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(1) });
+const identica = encontrarBuscaIdentica(protocoloDaBusca, "Google Scholar", "mesma string", 1000)!;
+checar("busca identica e detectada", identica !== null, true);
+checar("ja tem um registro vinculado", identica.registrosJaVinculados, 1);
+
+importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(2), anexarABusca: identica.id });
+const buscasDoProtocolo = db.select().from(busca).all()
+  .filter((b) => b.protocoloId === protocoloDaBusca);
+checar("anexar nao cria busca nova", buscasDoProtocolo.length, 1);
+checar("total de resultados acompanha o anexo", buscasDoProtocolo[0]!.totalResultados, 2);
+checar(
+  "os dois estudos existem",
+  listarEstudosParaEstagio(protocoloDaBusca, TRIAGEM_INICIAL).length,
+  2,
+);
+
+importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(2), anexarABusca: identica.id });
+checar(
+  "reanexar o mesmo artigo nao infla o total",
+  db.select().from(busca).all().find((b) => b.id === identica.id)!.totalResultados,
+  2,
+);
+
+importarParaOProtocolo({ ...dadosDaBusca, conteudo: artigo(3), executadaEmSegundos: 2000 });
+checar(
+  "data diferente cria busca nova",
+  db.select().from(busca).all().filter((b) => b.protocoloId === protocoloDaBusca).length,
+  2,
 );
 
 console.log(

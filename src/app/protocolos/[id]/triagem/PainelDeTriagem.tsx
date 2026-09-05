@@ -17,12 +17,6 @@ import {
   registrarDecisao,
 } from "./acoes";
 
-const TECLA_INCLUIR = "i";
-const TECLA_DUVIDA = "d";
-const TECLA_DESFAZER = "u";
-const TECLA_ANTERIOR = "ArrowLeft";
-const TECLA_PROXIMO = "ArrowRight";
-
 const ROTULO_DA_DECISAO: Record<Decisao, string> = {
   incluido: "Incluído",
   excluido: "Excluído",
@@ -184,20 +178,40 @@ export default function PainelDeTriagem({
     return ordem;
   }, [decisoes]);
 
-  const estudosFiltrados = useMemo(() => {
-    const doFiltro = estudos.filter((estudo) =>
-      filtro === "decididos"
-        ? decisaoDe(estudo.id) !== "pendente"
-        : decisaoDe(estudo.id) === filtro,
-    );
+  const estudosDoFiltro = useCallback(
+    (qual: Filtro) => {
+      const doFiltro = estudos.filter((estudo) =>
+        qual === "decididos"
+          ? decisaoDe(estudo.id) !== "pendente"
+          : decisaoDe(estudo.id) === qual,
+      );
 
-    if (filtro === "pendente") return doFiltro;
+      if (qual === "pendente") return doFiltro;
 
-    return doFiltro.sort(
-      (um, outro) =>
-        (ordemDaDecisao.get(outro.id) ?? 0) - (ordemDaDecisao.get(um.id) ?? 0),
-    );
-  }, [estudos, filtro, decisaoDe, ordemDaDecisao]);
+      return [...doFiltro].sort(
+        (um, outro) =>
+          (ordemDaDecisao.get(outro.id) ?? 0) - (ordemDaDecisao.get(um.id) ?? 0),
+      );
+    },
+    [estudos, decisaoDe, ordemDaDecisao],
+  );
+
+  const estudosFiltrados = useMemo(
+    () => estudosDoFiltro(filtro),
+    [estudosDoFiltro, filtro],
+  );
+
+  const selecionarFiltro = useCallback(
+    (qual: Filtro) => {
+      setFiltro(qual);
+
+      const primeiro = estudosDoFiltro(qual)[0];
+      if (!primeiro) return;
+
+      setIndiceAtual(estudos.findIndex((estudo) => estudo.id === primeiro.id));
+    },
+    [estudosDoFiltro, estudos],
+  );
 
   const irParaProximoPendente = useCallback(
     (aPartirDe: number) => {
@@ -290,61 +304,6 @@ export default function PainelDeTriagem({
     [estudos],
   );
 
-  useEffect(() => {
-    function aoTeclar(evento: KeyboardEvent) {
-      if (remocaoPendente !== null || descartePendente !== null) return;
-
-      const alvo = evento.target as HTMLElement | null;
-      const estaDigitando = alvo?.tagName === "INPUT" || alvo?.tagName === "TEXTAREA";
-      if (estaDigitando || evento.metaKey || evento.ctrlKey || evento.altKey) return;
-
-      const tecla = evento.key.toLowerCase();
-
-      if (tecla === TECLA_INCLUIR) {
-        evento.preventDefault();
-        decidir("incluido", null);
-        return;
-      }
-      if (tecla === TECLA_DUVIDA) {
-        evento.preventDefault();
-        decidir("duvida", null);
-        return;
-      }
-      if (tecla === TECLA_DESFAZER) {
-        evento.preventDefault();
-        desfazerAtual();
-        return;
-      }
-      if (evento.key === TECLA_ANTERIOR) {
-        evento.preventDefault();
-        setIndiceAtual((indice) => Math.max(0, indice - 1));
-        return;
-      }
-      if (evento.key === TECLA_PROXIMO) {
-        evento.preventDefault();
-        setIndiceAtual((indice) => Math.min(estudos.length - 1, indice + 1));
-        return;
-      }
-
-      const posicaoDoCriterio = Number(evento.key) - 1;
-      const criterioEscolhido = criterios[posicaoDoCriterio];
-      if (criterioEscolhido) {
-        evento.preventDefault();
-        decidir("excluido", criterioEscolhido.id);
-      }
-    }
-
-    window.addEventListener("keydown", aoTeclar);
-    return () => window.removeEventListener("keydown", aoTeclar);
-  }, [
-    decidir,
-    desfazerAtual,
-    criterios,
-    estudos.length,
-    remocaoPendente,
-    descartePendente,
-  ]);
-
   if (estudos.length === 0) {
     return (
       <div className="cartao vazio">
@@ -369,7 +328,7 @@ export default function PainelDeTriagem({
             key={chave}
             className={`filtro${filtro === chave ? " filtro-ativo" : ""}`}
             disabled={contagem[chave] === 0}
-            onClick={() => setFiltro(chave)}
+            onClick={() => selecionarFiltro(chave)}
           >
             {rotulo} <strong>{contagem[chave]}</strong>
           </button>
@@ -501,8 +460,9 @@ export default function PainelDeTriagem({
           onCancelar={() => setDescartePendente(null)}
         >
           <p className="modal-corpo">
-            O artigo sai do protocolo junto com sua decisão de triagem. Não dá
-            para desfazer — só reimportando o .bib.
+            O artigo sai do protocolo inteiro, com todas as decisões e dados
+            extraídos. Não dá para desfazer — só reimportando o arquivo. Para
+            apenas rejeitá-lo, use “Não incluir”.
           </p>
           <div className="modal-estudo">
             <p>{estudos.find((estudo) => estudo.id === descartePendente)?.titulo}</p>
@@ -559,6 +519,12 @@ function ArtigoEmTriagem({
   onDesfazer,
   onDescartar,
 }: PropsDoArtigo) {
+  const ehLeituraCompleta = criteriosDeInclusao.length > 0;
+  const criteriosPendentes = criteriosDeInclusao.filter(
+    (item) => !atendidos.has(item.id),
+  );
+  const podeIncluir = !ehLeituraCompleta || criteriosPendentes.length === 0;
+
   return (
     <article className="cartao">
       {decisao !== "pendente" && (
@@ -612,14 +578,12 @@ function ArtigoEmTriagem({
         )}
       </dl>
 
-      <div className="estudo-resumo">
-        {estudo.resumo ?? <em>Sem resumo no registro importado.</em>}
-      </div>
+      {estudo.resumo && <div className="estudo-resumo">{estudo.resumo}</div>}
 
       {criteriosDeInclusao.length > 0 && (
         <div className="alvo">
           <p className="alvo-titulo">
-            Critérios de inclusão — marque conforme confirma no texto (
+            Confirme no texto e marque (
             {atendidos.size}/{criteriosDeInclusao.length})
           </p>
           <ul className="lista-limpa">
@@ -648,66 +612,97 @@ function ArtigoEmTriagem({
         <button
           type="button"
           className="botao botao-primario"
+          disabled={!podeIncluir || decisao === "incluido"}
+          title={
+            decisao === "incluido"
+              ? "Este estudo já está incluído"
+              : podeIncluir
+                ? undefined
+                : `Faltam ${criteriosPendentes.length} critério(s) de inclusão`
+          }
           onClick={() => onDecidir("incluido", null)}
         >
-          Incluir <kbd>I</kbd>
+          Incluir
         </button>
-        <button type="button" className="botao" onClick={() => onDecidir("duvida", null)}>
-          Em dúvida <kbd>D</kbd>
+
+        {ehLeituraCompleta && (
+          <button
+            type="button"
+            className="botao botao-perigo-suave"
+            disabled={decisao === "excluido"}
+            title={
+              decisao === "excluido"
+                ? "Este estudo já está marcado como não incluído"
+                : "Registra o primeiro critério de inclusão não atendido"
+            }
+            onClick={() =>
+              onDecidir("excluido", criteriosPendentes[0]?.id ?? null)
+            }
+          >
+            Não incluir
+          </button>
+        )}
+        <button
+          type="button"
+          className="botao"
+          disabled={decisao === "duvida"}
+          title={decisao === "duvida" ? "Este estudo já está em dúvida" : undefined}
+          onClick={() => onDecidir("duvida", null)}
+        >
+          Em dúvida
         </button>
         <button
           type="button"
           className="botao"
           disabled={decisao === "pendente"}
+          title={
+            decisao === "pendente"
+              ? "Este estudo ainda não tem decisão"
+              : "Volta o estudo para pendente"
+          }
           onClick={onDesfazer}
         >
-          Desfazer <kbd>U</kbd>
+          Limpar decisão
         </button>
-        <button
-          type="button"
-          className="botao botao-perigo-suave botao-a-direita"
-          onClick={onDescartar}
-        >
-          Descartar artigo
-        </button>
-      </div>
-
-      <p className="alvo-titulo" style={{ marginTop: "1.25rem" }}>
-        Ou excluir por um destes motivos:
-      </p>
-      <div className="criterios">
-        {criterios.map((criterioDeExclusao, posicao) => (
+        {!ehLeituraCompleta && (
           <button
             type="button"
-            key={criterioDeExclusao.id}
-            className="criterio"
-            onClick={() => onDecidir("excluido", criterioDeExclusao.id)}
+            className="botao botao-perigo-suave botao-a-direita"
+            title="Remove o artigo do protocolo inteiro, não apenas desta fase"
+            onClick={onDescartar}
           >
-            <kbd>{posicao + 1}</kbd>
-            <span>
-              <strong>{criterioDeExclusao.codigo}</strong> — {criterioDeExclusao.descricao}
-            </span>
+            Descartar artigo
           </button>
-        ))}
+        )}
       </div>
 
-      <div className="atalhos">
-        <span>
-          <kbd>I</kbd> incluir
-        </span>
-        <span>
-          <kbd>1</kbd>–<kbd>{criterios.length}</kbd> excluir pelo critério
-        </span>
-        <span>
-          <kbd>D</kbd> dúvida
-        </span>
-        <span>
-          <kbd>U</kbd> desfazer
-        </span>
-        <span>
-          <kbd>←</kbd> <kbd>→</kbd> navegar
-        </span>
-      </div>
+      {!ehLeituraCompleta && (
+        <>
+          <p className="alvo-titulo" style={{ marginTop: "1.5rem" }}>
+Para não incluir, aponte o motivo
+          </p>
+          <div className="criterios">
+            {criterios.map((criterioDeExclusao) => (
+              <button
+                type="button"
+                key={criterioDeExclusao.id}
+                className="criterio"
+                disabled={criterioAplicado === criterioDeExclusao.codigo}
+                title={
+                  criterioAplicado === criterioDeExclusao.codigo
+                    ? "Já excluído por este motivo"
+                    : undefined
+                }
+                onClick={() => onDecidir("excluido", criterioDeExclusao.id)}
+              >
+                <span className="marca-criterio">{criterioDeExclusao.codigo}</span>
+                <span className="texto-criterio">{criterioDeExclusao.descricao}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
     </article>
   );
 }

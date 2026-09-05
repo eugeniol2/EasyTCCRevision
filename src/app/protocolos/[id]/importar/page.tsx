@@ -13,14 +13,15 @@ export default async function PaginaDeImportacao({
 
   return (
     <>
+      <a className="voltar" href={`/protocolos/${id}`}>
+        ← Voltar ao protocolo
+      </a>
+
       <header className="cabecalho">
         <div>
           <h1>Importar estudos</h1>
           <p className="subtitulo">{protocolo.titulo}</p>
         </div>
-        <a className="botao" href={`/protocolos/${id}`}>
-          Voltar
-        </a>
       </header>
 
       <p className="subtitulo" style={{ marginBottom: "1.25rem" }}>

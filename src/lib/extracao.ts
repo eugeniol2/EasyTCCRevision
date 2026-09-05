@@ -2,9 +2,16 @@ import { randomUUID } from "node:crypto";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { campoExtracao, estudo, extracao, triagem } from "@/db/schema";
-import { LEITURA_COMPLETA, type EstudoParaTriagem } from "@/lib/consultas";
+import { alias } from "drizzle-orm/sqlite-core";
+import { CAMPOS_PADRAO, type TipoDeCampo } from "@/lib/campos";
+import {
+  LEITURA_COMPLETA,
+  TRIAGEM_INICIAL,
+  type EstudoParaTriagem,
+} from "@/lib/consultas";
 
-export type TipoDeCampo = "texto" | "booleano" | "numero" | "opcoes";
+export type { TipoDeCampo };
+export { AVALIACAO_DE_QUALIDADE, CAMPOS_PADRAO, ehCampoObrigatorio } from "@/lib/campos";
 
 export interface CampoDeExtracao {
   id: string;
@@ -13,18 +20,6 @@ export interface CampoDeExtracao {
   opcoes: string[] | null;
   ordem: number;
 }
-
-export const AVALIACAO_DE_QUALIDADE = {
-  nome: "Qualidade metodológica",
-  tipo: "opcoes" as TipoDeCampo,
-  opcoes: ["Alta", "Média", "Baixa"],
-};
-
-export const CAMPOS_PADRAO: { nome: string; tipo: TipoDeCampo }[] = [
-  { nome: "Objetivo", tipo: "texto" },
-  { nome: "Metodologia", tipo: "texto" },
-  { nome: "Resultados", tipo: "texto" },
-];
 
 export function listarCampos(protocoloId: string): CampoDeExtracao[] {
   return db
@@ -53,6 +48,7 @@ export function criarCamposPadrao(protocoloId: string): number {
         protocoloId,
         nome: campo.nome,
         tipo: campo.tipo,
+        opcoes: campo.opcoes ?? null,
         ordem,
       })),
     )
@@ -93,10 +89,12 @@ export interface EstudoParaExtracao {
   camposPreenchidos: number;
 }
 
+const decisaoDaFase1 = alias(triagem, "fase1");
+
 /**
- * Só entram na extração os estudos incluídos na leitura de texto completo:
- * é o conjunto final da revisão, o mesmo que vai para a tabela de trabalhos
- * relacionados.
+ * Só entram na extração os estudos incluídos nas duas fases. Exigir apenas
+ * a fase 2 deixava passar registros órfãos: decisões de leitura tomadas
+ * antes de a decisão da fase 1 ser revista para fora do funil.
  */
 export function listarEstudosParaExtracao(
   protocoloId: string,
@@ -118,6 +116,14 @@ export function listarEstudosParaExtracao(
         eq(triagem.estudoId, estudo.id),
         eq(triagem.estagio, LEITURA_COMPLETA),
         eq(triagem.decisao, "incluido"),
+      ),
+    )
+    .innerJoin(
+      decisaoDaFase1,
+      and(
+        eq(decisaoDaFase1.estudoId, estudo.id),
+        eq(decisaoDaFase1.estagio, TRIAGEM_INICIAL),
+        eq(decisaoDaFase1.decisao, "incluido"),
       ),
     )
     .where(eq(estudo.protocoloId, protocoloId))

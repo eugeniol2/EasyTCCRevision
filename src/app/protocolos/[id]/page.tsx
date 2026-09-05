@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { db } from "@/db/client";
 import { busca } from "@/db/schema";
@@ -27,7 +27,29 @@ export default async function PaginaDoProtocolo({
   const naTriagem = contarPorDecisao(id, TRIAGEM_INICIAL);
   const naLeitura = contarPorDecisao(id, LEITURA_COMPLETA);
   const naExtracao = medirProgresso(id);
-  const buscas = db.select().from(busca).where(eq(busca.protocoloId, id)).all();
+
+  const fase2Liberada = naTriagem.incluido > 0;
+  const fase3Liberada = naLeitura.incluido > 0;
+  const classeDaFase = (temPendentes: boolean) =>
+    `cartao${temPendentes ? " cartao-alerta" : ""}`;
+
+  const proximoPasso =
+    naTriagem.pendente > 0
+      ? "triagem"
+      : fase2Liberada && naLeitura.pendente > 0
+        ? "leitura"
+        : fase3Liberada && naExtracao.completos < naExtracao.estudos
+          ? "extracao"
+          : "sintese";
+
+  const destaque = (passo: string) =>
+    `botao${proximoPasso === passo ? " botao-primario" : ""}`;
+  const buscas = db
+    .select()
+    .from(busca)
+    .where(eq(busca.protocoloId, id))
+    .orderBy(desc(busca.executadaEm), sql`rowid desc`)
+    .all();
 
   return (
     <>
@@ -48,7 +70,7 @@ export default async function PaginaDoProtocolo({
         </div>
       </header>
 
-      <section className="cartao">
+      <section className={classeDaFase(naTriagem.pendente > 0)}>
         <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Fase 1 — Título e resumo</h2>
         <div className="contadores">
           <span>
@@ -68,8 +90,8 @@ export default async function PaginaDoProtocolo({
           </span>
         </div>
         <div className="linha-acoes">
-          <a className="botao botao-primario" href={`/protocolos/${id}/triagem`}>
-            Continuar triagem
+          <a className={destaque("triagem")} href={`/protocolos/${id}/triagem`}>
+            {naTriagem.pendente > 0 ? "Continuar triagem" : "Revisar triagem"}
           </a>
           <a className="botao" href={`/protocolos/${id}/importar`}>
             Importar .bib ou .csv
@@ -83,10 +105,13 @@ export default async function PaginaDoProtocolo({
         </div>
       </section>
 
-      <section className="cartao" style={{ marginTop: "1.25rem" }}>
+      <section
+        className={classeDaFase(fase2Liberada && naLeitura.pendente > 0)}
+        style={{ marginTop: "1.25rem" }}
+      >
         <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Fase 2 — Texto completo</h2>
         <p className="subtitulo" style={{ marginBottom: "0.5rem" }}>
-          Recebe apenas os incluídos na fase 1.
+          Recebe quem você incluiu na fase 1. É onde você lê o artigo inteiro.
         </p>
         <div className="contadores">
           <span>
@@ -106,19 +131,27 @@ export default async function PaginaDoProtocolo({
           </span>
         </div>
         <div className="linha-acoes">
-          <a
-            className={`botao${naLeitura.total > 0 ? " botao-primario" : ""}`}
-            href={`/protocolos/${id}/leitura`}
-          >
-            Ler textos completos
-          </a>
+          {fase2Liberada ? (
+            <a className={destaque("leitura")} href={`/protocolos/${id}/leitura`}>
+              {naLeitura.pendente > 0 ? "Ler textos completos" : "Revisar leitura"}
+            </a>
+          ) : (
+            <span className="botao botao-bloqueado">
+              Ler textos completos — inclua ao menos um estudo na fase 1
+            </span>
+          )}
         </div>
       </section>
 
-      <section className="cartao" style={{ marginTop: "1.25rem" }}>
+      <section
+        className={classeDaFase(
+          fase3Liberada && naExtracao.completos < naExtracao.estudos,
+        )}
+        style={{ marginTop: "1.25rem" }}
+      >
         <h2 style={{ fontSize: "1rem", marginTop: 0 }}>Fase 3 — Extração</h2>
         <p className="subtitulo" style={{ marginBottom: "0.5rem" }}>
-          Os dados de cada estudo incluído na fase 2.
+          Recebe quem você incluiu na fase 2. É a tabela final da revisão.
         </p>
         <div className="contadores">
           <span>
@@ -132,13 +165,18 @@ export default async function PaginaDoProtocolo({
           </span>
         </div>
         <div className="linha-acoes">
-          <a
-            className={`botao${naExtracao.estudos > 0 ? " botao-primario" : ""}`}
-            href={`/protocolos/${id}/extracao`}
-          >
-            Preencher extração
-          </a>
-          <a className="botao" href={`/protocolos/${id}/relatorio`}>
+          {fase3Liberada ? (
+            <a className={destaque("extracao")} href={`/protocolos/${id}/extracao`}>
+              {naExtracao.completos < naExtracao.estudos
+                ? "Preencher extração"
+                : "Revisar extração"}
+            </a>
+          ) : (
+            <span className="botao botao-bloqueado">
+              Preencher extração — inclua ao menos um estudo na fase 2
+            </span>
+          )}
+          <a className={destaque("sintese")} href={`/protocolos/${id}/relatorio`}>
             Ver síntese e exportar
           </a>
         </div>

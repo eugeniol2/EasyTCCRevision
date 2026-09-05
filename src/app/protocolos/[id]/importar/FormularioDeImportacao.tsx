@@ -14,27 +14,7 @@ import { lerArquivo } from "@/lib/leitura";
 import { importarBibtex } from "./acoes";
 import { RESULTADO_INICIAL } from "./resultado";
 
-const BASES_SUGERIDAS = [
-  "Scopus",
-  "Web of Science",
-  "IEEE Xplore",
-  "ACM Digital Library",
-  "SpringerLink",
-  "ScienceDirect",
-  "Wiley Online Library",
-  "Engineering Village (Compendex)",
-  "Taylor & Francis Online",
-  "Emerald Insight",
-  "arXiv",
-  "DBLP",
-  "Semantic Scholar",
-  "OpenAlex",
-  "PubMed",
-  "SciELO",
-  "BDTD",
-  "Portal de Periódicos CAPES",
-  "Google Scholar",
-];
+const BASES = ["IEEE Xplore", "SpringerLink", "Google Scholar"];
 
 const EXTENSOES_ACEITAS = ".bib,.bibtex,.csv,.txt";
 const CARACTERE_DE_SUBSTITUICAO = "�";
@@ -68,6 +48,12 @@ export default function FormularioDeImportacao({
   const campoDeArquivo = useRef<HTMLInputElement>(null);
   const campoDaString = useRef<HTMLTextAreaElement>(null);
   const formulario = useRef<HTMLFormElement>(null);
+  const campoDoModo = useRef<HTMLInputElement>(null);
+
+  function reenviarComo(modo: "anexar" | "nova") {
+    if (campoDoModo.current) campoDoModo.current.value = modo;
+    formulario.current?.requestSubmit();
+  }
 
   const ajustarAltura = useCallback((campo: HTMLTextAreaElement | null) => {
     if (!campo) return;
@@ -85,6 +71,7 @@ export default function FormularioDeImportacao({
     setConteudo("");
     setNomeDoArquivo(null);
     formulario.current?.reset();
+    if (campoDoModo.current) campoDoModo.current.value = "";
     ajustarAltura(campoDaString.current);
   }, [resultado, ajustarAltura]);
 
@@ -111,15 +98,20 @@ export default function FormularioDeImportacao({
     <>
       <form ref={formulario} action={enviar} className="cartao grade">
         <input type="hidden" name="protocoloId" value={protocoloId} />
+        <input ref={campoDoModo} type="hidden" name="modo" defaultValue="" />
 
         <div>
           <label htmlFor="base">Base consultada</label>
-          <input id="base" name="base" list="bases" required placeholder="Scopus" />
-          <datalist id="bases">
-            {BASES_SUGERIDAS.map((base) => (
-              <option key={base} value={base} />
+          <select id="base" name="base" required defaultValue="">
+            <option value="" disabled>
+              Selecione a base
+            </option>
+            {BASES.map((base) => (
+              <option key={base} value={base}>
+                {base}
+              </option>
             ))}
-          </datalist>
+          </select>
         </div>
 
         <div>
@@ -209,6 +201,36 @@ export default function FormularioDeImportacao({
       </form>
 
       {resultado.estado === "erro" && <div className="aviso">{resultado.mensagem}</div>}
+
+      {resultado.estado === "conflito" && resultado.conflito && (
+        <div className="aviso">
+          <strong>Esta busca já está registrada.</strong>
+          <p style={{ margin: "0.5rem 0" }}>
+            Já existe uma busca em {resultado.conflito.base} com esta mesma string
+            em {resultado.conflito.dataFormatada}, com{" "}
+            {resultado.conflito.registrosJaVinculados} registro(s). Os artigos do
+            arquivo entram de qualquer forma — a escolha é só onde eles ficam
+            registrados.
+          </p>
+          <div className="linha-acoes" style={{ marginTop: "0.75rem" }}>
+            <button
+              type="button"
+              className="botao botao-primario"
+              onClick={() => reenviarComo("anexar")}
+            >
+              Anexar à busca existente
+            </button>
+            <button
+              type="button"
+              className="botao"
+              onClick={() => reenviarComo("nova")}
+              title="Use se foi mesmo uma segunda execução da busca"
+            >
+              Registrar como busca nova
+            </button>
+          </div>
+        </div>
+      )}
 
       {resultado.estado === "sucesso" && (
         <section className="cartao" style={{ marginTop: "1.25rem" }}>

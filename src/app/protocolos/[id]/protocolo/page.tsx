@@ -15,17 +15,18 @@ export default async function PaginaDoProtocoloEditavel({
 
   return (
     <>
+      <a className="voltar" href={`/protocolos/${id}`}>
+        ← Voltar ao protocolo
+      </a>
+
       <header className="cabecalho">
         <div>
           <h1>Protocolo</h1>
           <p className="subtitulo">
-            Pergunta de pesquisa e critérios de seleção — definidos antes da triagem,
-            editáveis a qualquer momento.
+            O que você procura e as regras para decidir. Vale definir antes de
+            começar a triagem, mas dá para ajustar a qualquer momento.
           </p>
         </div>
-        <a className="botao" href={`/protocolos/${id}`}>
-          Voltar
-        </a>
       </header>
 
       <EditorDoProtocolo
